@@ -58,6 +58,11 @@ if TYPE_CHECKING:
 
 _logger = get_logger(__name__)
 DEBUG_PSBT_PARSING = False
+ANON_MARKER = 0xffffffa0
+OUTPUT_STANDARD = 1
+OUTPUT_CT = 2
+OUTPUT_RINGCT = 3
+OUTPUT_DATA = 4
 
 
 class SerializationError(Exception):
@@ -92,10 +97,16 @@ SIGHASH_ALL = 1
 
 
 class TxOutput:
+    output_type: int
     scriptpubkey: bytes
     value: Union[int, str]
+    data: bytes
+    pubkey: bytes
+    commitment: bytes
+    rangeproof: bytes
 
     def __init__(self, *, scriptpubkey: bytes, value: Union[int, str]):
+        self.output_type = OUTPUT_STANDARD
         self.scriptpubkey = scriptpubkey
         self.value = value  # str when the output is set to max: '!'  # in satoshis
 
@@ -104,12 +115,36 @@ class TxOutput:
         return cls(scriptpubkey=bfh(bitcoin.address_to_script(address)),
                    value=value)
 
-    def serialize_to_network(self) -> bytes:
-        buf = int.to_bytes(self.value, 8, byteorder="little", signed=False)
-        script = self.scriptpubkey
-        buf += bfh(var_int(len(script.hex()) // 2))
-        buf += script
+    def serialize_for_sighash(self) -> bytes:
+        buf = bytes()
+        if self.output_type == OUTPUT_STANDARD:
+            buf += int.to_bytes(self.value, 8, byteorder="little", signed=False)
+            script = self.scriptpubkey
+            buf += bfh(var_int(len(script.hex()) // 2))
+            buf += script
+        elif self.output_type == OUTPUT_CT:
+            buf += self.commitment
+            buf += bfh(var_int(len(self.data)))
+            buf += self.data
+            buf += bfh(var_int(len(self.script)))
+            buf += self.script
+            buf += bfh(var_int(len(self.rangeproof)))
+            buf += self.rangeproof
+        elif self.output_type == OUTPUT_RINGCT:
+            buf += self.pubkey
+            buf += self.commitment
+            buf += bfh(var_int(len(self.data)))
+            buf += self.data
+            buf += bfh(var_int(len(self.rangeproof)))
+            buf += self.rangeproof
+        elif self.output_type == OUTPUT_DATA:
+            buf += bfh(var_int(len(data)))
+            buf += data
         return buf
+
+    def serialize_to_network(self) -> bytes:
+        buf = bytes((self.output_type, ))
+        return buf + self.serialize_for_sighash()
 
     @classmethod
     def from_network_bytes(cls, raw: bytes) -> 'TxOutput':
@@ -500,6 +535,10 @@ def parse_input(vds: BCDataStream) -> TxInput:
     prevout = TxOutpoint(txid=prevout_hash, out_idx=prevout_n)
     script_sig = vds.read_bytes(vds.read_compact_size())
     nsequence = vds.read_uint32()
+
+    if prevout_n == 0xffffffa0:
+        n = vds.read_compact_size()
+        script_data = list(vds.read_bytes(vds.read_compact_size()) for i in range(n))
     return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence)
 
 
@@ -510,13 +549,38 @@ def parse_witness(vds: BCDataStream, txin: TxInput) -> None:
 
 
 def parse_output(vds: BCDataStream) -> TxOutput:
-    value = vds.read_int64()
-    if value > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN:
-        raise SerializationError('invalid output amount (too large)')
-    if value < 0:
-        raise SerializationError('invalid output amount (negative)')
-    scriptpubkey = vds.read_bytes(vds.read_compact_size())
-    return TxOutput(value=value, scriptpubkey=scriptpubkey)
+    output_type = vds.read_bytes(1)[0]
+
+    if output_type == OUTPUT_STANDARD:
+        value = vds.read_int64()
+        if value > TOTAL_COIN_SUPPLY_LIMIT_IN_BTC * COIN:
+            raise SerializationError('invalid output amount (too large)')
+        if value < 0:
+            raise SerializationError('invalid output amount (negative)')
+        scriptpubkey = vds.read_bytes(vds.read_compact_size())
+        return TxOutput(value=value, scriptpubkey=scriptpubkey)
+    elif output_type == OUTPUT_CT:
+        txo = TxOutput(value=0, scriptpubkey=bytes())
+        txo.output_type = output_type
+        txo.commitment = vds.read_bytes(33)
+        txo.data = vds.read_bytes(vds.read_compact_size())
+        txo.pk_script = vds.read_bytes(vds.read_compact_size())
+        txo.rangeproof = vds.read_bytes(vds.read_compact_size())
+        return txo
+    elif output_type == OUTPUT_RINGCT:
+        txo = TxOutput(value=0, scriptpubkey=bytes())
+        txo.output_type = output_type
+        txo.pubkey = vds.read_bytes(33)
+        txo.commitment = vds.read_bytes(33)
+        txo.data = vds.read_bytes(vds.read_compact_size())
+        txo.rangeproof = vds.read_bytes(vds.read_compact_size())
+        return txo
+    elif output_type == OUTPUT_DATA:
+        txo = TxOutput(value=0, scriptpubkey=bytes())
+        txo.output_type = output_type
+        txo.data = vds.read_bytes(vds.read_compact_size())
+        return txo
+    raise SerializationError("Unknown Particl output type.")
 
 
 # pay & redeem scripts
@@ -548,7 +612,7 @@ class Transaction:
         self._inputs = None  # type: List[TxInput]
         self._outputs = None  # type: List[TxOutput]
         self._locktime = 0
-        self._version = 2
+        self._version = 0xa0
 
         self._cached_txid = None  # type: Optional[str]
 
@@ -601,7 +665,9 @@ class Transaction:
         raw_bytes = bfh(self._cached_network_ser)
         vds = BCDataStream()
         vds.write(raw_bytes)
-        self._version = vds.read_int32()
+
+        self._version = vds.read_int16()
+        self._locktime = vds.read_uint32()
         n_vin = vds.read_compact_size()
         is_segwit = (n_vin == 0)
         if is_segwit:
@@ -609,6 +675,8 @@ class Transaction:
             if marker != b'\x01':
                 raise ValueError('invalid txn marker byte: {}'.format(marker))
             n_vin = vds.read_compact_size()
+
+        is_segwit = True
         if n_vin < 1:
             raise SerializationError('tx needs to have at least 1 input')
         self._inputs = [parse_input(vds) for i in range(n_vin)]
@@ -619,7 +687,6 @@ class Transaction:
         if is_segwit:
             for txin in self._inputs:
                 parse_witness(vds, txin)
-        self._locktime = vds.read_uint32()
         if vds.can_read_more():
             raise SerializationError('extra junk at the end')
 
@@ -775,7 +842,7 @@ class Transaction:
         outputs = self.outputs()
         hashPrevouts = bh2u(sha256d(b''.join(txin.prevout.serialize_to_network() for txin in inputs)))
         hashSequence = bh2u(sha256d(bfh(''.join(int_to_hex(txin.nsequence, 4) for txin in inputs))))
-        hashOutputs = bh2u(sha256d(bfh(''.join(o.serialize_to_network().hex() for o in outputs))))
+        hashOutputs = bh2u(sha256d(bfh(''.join(o.serialize_for_sighash().hex() for o in outputs))))
         return BIP143SharedTxDigestFields(hashPrevouts=hashPrevouts,
                                           hashSequence=hashSequence,
                                           hashOutputs=hashOutputs)
@@ -803,7 +870,7 @@ class Transaction:
         note: (not include_sigs) implies force_legacy
         """
         self.deserialize()
-        nVersion = int_to_hex(self.version, 4)
+        nVersion = int_to_hex(self.version, 2)
         nLocktime = int_to_hex(self.locktime, 4)
         inputs = self.inputs()
         outputs = self.outputs()
@@ -819,13 +886,12 @@ class Transaction:
         use_segwit_ser_for_estimate_size = estimate_size and self.is_segwit(guess_for_address=True)
         use_segwit_ser_for_actual_use = not estimate_size and self.is_segwit()
         use_segwit_ser = use_segwit_ser_for_estimate_size or use_segwit_ser_for_actual_use
-        if include_sigs and not force_legacy and use_segwit_ser:
-            marker = '00'
-            flag = '01'
+
+        if include_sigs:
             witness = ''.join(self.serialize_witness(x, estimate_size=estimate_size) for x in inputs)
-            return nVersion + marker + flag + txins + txouts + witness + nLocktime
+            return nVersion + nLocktime + txins + txouts + witness
         else:
-            return nVersion + txins + txouts + nLocktime
+            return nVersion + nLocktime + txins + txouts
 
     def to_qr_data(self) -> str:
         """Returns tx as data to be put into a QR code. No side-effects."""
@@ -843,7 +909,7 @@ class Transaction:
             if not all_segwit and not self.is_complete():
                 return None
             try:
-                ser = self.serialize_to_network(force_legacy=True)
+                ser = self.serialize_to_network(force_legacy=True, include_sigs=False)
             except UnknownTxinType:
                 # we might not know how to construct scriptSig for some scripts
                 return None
@@ -907,7 +973,7 @@ class Transaction:
 
     @classmethod
     def virtual_size_from_weight(cls, weight):
-        return weight // 4 + (weight % 4 > 0)
+        return weight // 2 + (weight % 2 > 0)
 
     @classmethod
     def satperbyte_from_satperkw(cls, feerate_kw):
@@ -939,7 +1005,7 @@ class Transaction:
         """Return an estimate of transaction weight."""
         total_tx_size = self.estimated_total_size()
         base_tx_size = self.estimated_base_size()
-        return 3 * base_tx_size + total_tx_size
+        return 1 * base_tx_size + total_tx_size
 
     def is_complete(self) -> bool:
         return True

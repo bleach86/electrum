@@ -40,8 +40,8 @@ def read_json(filename, default):
     return r
 
 
-GIT_REPO_URL = "https://github.com/spesmilo/electrum"
-GIT_REPO_ISSUES_URL = "https://github.com/spesmilo/electrum/issues"
+GIT_REPO_URL = "https://github.com/tecnovert/electrum"
+GIT_REPO_ISSUES_URL = "https://github.com/tecnovert/electrum/issues"
 BIP39_WALLET_FORMATS = read_json('bip39_wallet_formats.json', [])
 
 
@@ -68,74 +68,71 @@ class AbstractNet:
         return bytes.fromhex(bitcoin.rev_hex(cls.GENESIS))
 
 
-class BitcoinMainnet(AbstractNet):
+class ParticlMainnet(AbstractNet):
 
     NET_NAME = "mainnet"
     TESTNET = False
-    WIF_PREFIX = 0x80
-    ADDRTYPE_P2PKH = 0
-    ADDRTYPE_P2SH = 5
-    SEGWIT_HRP = "bc"
+    WIF_PREFIX = 0x6c
+    ADDRTYPE_P2PKH = 0x38
+    ADDRTYPE_P2SH = 0x3c
+    SEGWIT_HRP = "pw"
     BOLT11_HRP = SEGWIT_HRP
-    GENESIS = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+    GENESIS = "0000ee0784c195317ac95623e22fddb8c7b8825dc3998e0bb924d66866eccf4c"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
     DEFAULT_SERVERS = read_json('servers.json', {})
-    CHECKPOINTS = read_json('checkpoints.json', [])
+    CHECKPOINTS = []  # read_json('checkpoints.json', [])
     BLOCK_HEIGHT_FIRST_LIGHTNING_CHANNELS = 497000
 
     XPRV_HEADERS = {
-        'standard':    0x0488ade4,  # xprv
-        'p2wpkh-p2sh': 0x049d7878,  # yprv
-        'p2wsh-p2sh':  0x0295b005,  # Yprv
-        'p2wpkh':      0x04b2430c,  # zprv
-        'p2wsh':       0x02aa7a99,  # Zprv
+        'standard':    0x8f1daeb8,  # XPAR
+        'p2wpkh-p2sh': 0x0497347d,  # yXPA
+        'p2wsh-p2sh':  0x947e7a7a,  # YXPA
+        'p2wpkh':      0x04abff11,  # zXPA
+        'p2wsh':       0x9934602a,  # ZXPA
     }
     XPRV_HEADERS_INV = inv_dict(XPRV_HEADERS)
     XPUB_HEADERS = {
-        'standard':    0x0488b21e,  # xpub
-        'p2wpkh-p2sh': 0x049d7cb2,  # ypub
-        'p2wsh-p2sh':  0x0295b43f,  # Ypub
-        'p2wpkh':      0x04b24746,  # zpub
-        'p2wsh':       0x02aa7ed3,  # Zpub
+        'standard':    0x696e82d1,  # PPAR
+        'p2wpkh-p2sh': 0x04945657,  # yPPA
+        'p2wsh-p2sh':  0x93d825fa,  # YPPA
+        'p2wpkh':      0x04a920ea,  # zPPA
+        'p2wsh':       0x988e0b6a,  # ZPPA
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
     BIP44_COIN_TYPE = 0
     LN_REALM_BYTE = 0
     LN_DNS_SEEDS = [
-        'nodes.lightning.directory.',
-        'lseed.bitcoinstats.com.',
-        'lseed.darosior.ninja',
     ]
 
 
-class BitcoinTestnet(AbstractNet):
+class ParticlTestnet(AbstractNet):
 
     NET_NAME = "testnet"
     TESTNET = True
-    WIF_PREFIX = 0xef
-    ADDRTYPE_P2PKH = 111
-    ADDRTYPE_P2SH = 196
-    SEGWIT_HRP = "tb"
+    WIF_PREFIX = 0x2e
+    ADDRTYPE_P2PKH = 0x76
+    ADDRTYPE_P2SH = 0x7a
+    SEGWIT_HRP = "tpw"
     BOLT11_HRP = SEGWIT_HRP
-    GENESIS = "000000000933ea01ad0ee984209779baaec3ced90fa3f408719526f8d77f4943"
+    GENESIS = "0000594ada5310b367443ee0afd4fa3d0bbd5850ea4e33cdc7d6a904a7ec7c90"
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}
     DEFAULT_SERVERS = read_json('servers_testnet.json', {})
-    CHECKPOINTS = read_json('checkpoints_testnet.json', [])
+    CHECKPOINTS = []  # read_json('checkpoints_testnet.json', [])
 
     XPRV_HEADERS = {
-        'standard':    0x04358394,  # tprv
-        'p2wpkh-p2sh': 0x044a4e28,  # uprv
-        'p2wsh-p2sh':  0x024285b5,  # Uprv
-        'p2wpkh':      0x045f18bc,  # vprv
-        'p2wsh':       0x02575048,  # Vprv
+        'standard':    0x04889478,  # xpar
+        'p2wpkh-p2sh': 0x04a052ea,  # yxpa
+        'p2wsh-p2sh':  0x968f5f0a,  # Yxpa
+        'p2wpkh':      0x04b51d7e,  # zxpa
+        'p2wsh':       0x9b454494,  # Zxpa
     }
     XPRV_HEADERS_INV = inv_dict(XPRV_HEADERS)
     XPUB_HEADERS = {
-        'standard':    0x043587cf,  # tpub
-        'p2wpkh-p2sh': 0x044a5262,  # upub
-        'p2wsh-p2sh':  0x024289ef,  # Upub
-        'p2wpkh':      0x045f1cf6,  # vpub
-        'p2wsh':       0x02575483,  # Vpub
+        'standard':    0xe1427800,  # ppar
+        'p2wpkh-p2sh': 0x95e90a84,  # Yppa
+        'p2wsh-p2sh':  0x049d74c4,  # yppa
+        'p2wpkh':      0x04b23f58,  # zppa
+        'p2wsh':       0x9a9eeff9,  # Zppa
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
     BIP44_COIN_TYPE = 1
@@ -146,18 +143,18 @@ class BitcoinTestnet(AbstractNet):
     ]
 
 
-class BitcoinRegtest(BitcoinTestnet):
+class ParticlRegtest(ParticlTestnet):
 
     NET_NAME = "regtest"
-    SEGWIT_HRP = "bcrt"
+    SEGWIT_HRP = "rtpw"
     BOLT11_HRP = SEGWIT_HRP
-    GENESIS = "0f9188f13cb7b2c71f2a335e3a4fc328bf5beb436012afca590b1a11466e2206"
+    GENESIS = "6cd174536c0ada5bfa3b8fde16b98ae508fff6586f2ee24cf866867098f25907"
     DEFAULT_SERVERS = read_json('servers_regtest.json', {})
     CHECKPOINTS = []
     LN_DNS_SEEDS = []
 
 
-class BitcoinSimnet(BitcoinTestnet):
+class ParticlSimnet(ParticlTestnet):
 
     NET_NAME = "simnet"
     WIF_PREFIX = 0x64
@@ -171,7 +168,7 @@ class BitcoinSimnet(BitcoinTestnet):
     LN_DNS_SEEDS = []
 
 
-class BitcoinSignet(BitcoinTestnet):
+class ParticlSignet(ParticlTestnet):
 
     NET_NAME = "signet"
     BOLT11_HRP = "tbs"
@@ -184,24 +181,24 @@ class BitcoinSignet(BitcoinTestnet):
 NETS_LIST = tuple(all_subclasses(AbstractNet))
 
 # don't import net directly, import the module instead (so that net is singleton)
-net = BitcoinMainnet
+net = ParticlMainnet
 
 def set_signet():
     global net
-    net = BitcoinSignet
+    net = ParticlSignet
 
 def set_simnet():
     global net
-    net = BitcoinSimnet
+    net = ParticlSimnet
 
 def set_mainnet():
     global net
-    net = BitcoinMainnet
+    net = ParticlMainnet
 
 def set_testnet():
     global net
-    net = BitcoinTestnet
+    net = ParticlTestnet
 
 def set_regtest():
     global net
-    net = BitcoinRegtest
+    net = ParticlRegtest

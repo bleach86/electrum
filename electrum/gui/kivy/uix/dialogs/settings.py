@@ -49,7 +49,7 @@ Builder.load_string('''
                 SettingsItem:
                     bu: app.base_unit
                     title: _('Denomination') + ': ' + self.bu
-                    description: _("Base unit for Bitcoin amounts.")
+                    description: _("Base unit for Particl amounts.")
                     action: partial(root.unit_dialog, self)
                 CardSeparator
                 SettingsItem:
