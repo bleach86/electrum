@@ -560,8 +560,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         if self.wallet.is_watching_only():
             msg = ' '.join([
                 _("This wallet is watching-only."),
-                _("This means you will not be able to spend Bitcoins with it."),
-                _("Make sure you own the seed phrase or the private keys, before you request Bitcoins to be sent to this wallet.")
+                _("This means you will not be able to spend Particl with it."),
+                _("Make sure you own the seed phrase or the private keys, before you request Particl to be sent to this wallet.")
             ])
             self.show_warning(msg, title=_('Watch-only wallet'))
 
@@ -785,7 +785,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         d = self.network.get_donation_address()
         if d:
             host = self.network.get_parameters().server.host
-            self.pay_to_URI('bitcoin:%s?message=donation for %s'%(d, host))
+            self.pay_to_URI('particl:%s?message=donation for %s'%(d, host))
         else:
             self.show_error(_('No donation address for this server'))
 
@@ -1353,7 +1353,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.payto_e = PayToEdit(self)
         self.payto_e.addPasteButton(self.app)
         msg = _('Recipient of the funds.') + '\n\n'\
-              + _('You may enter a Bitcoin address, a label from your list of contacts (a list of completions will be proposed), or an alias (email-like address that forwards to a Bitcoin address)')
+              + _('You may enter a Particl address, a label from your list of contacts (a list of completions will be proposed), or an alias (email-like address that forwards to a Particl address)')
         payto_label = HelpLabel(_('Pay to'), msg)
         grid.addWidget(payto_label, 1, 0)
         grid.addWidget(self.payto_e, 1, 1, 1, -1)
@@ -1507,7 +1507,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         for o in outputs:
             if o.scriptpubkey is None:
-                self.show_error(_('Bitcoin Address is None'))
+                self.show_error(_('Particl Address is None'))
                 return True
             if o.value is None:
                 self.show_error(_('Invalid Amount'))

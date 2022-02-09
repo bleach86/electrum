@@ -138,8 +138,8 @@ class TxOutput:
             buf += bfh(var_int(len(self.rangeproof)))
             buf += self.rangeproof
         elif self.output_type == OUTPUT_DATA:
-            buf += bfh(var_int(len(data)))
-            buf += data
+            buf += bfh(var_int(len(self.data)))
+            buf += self.data
         return buf
 
     def serialize_to_network(self) -> bytes:
@@ -732,9 +732,9 @@ class Transaction:
         if _type in ('address', 'unknown') and estimate_size:
             _type = cls.guess_txintype_from_address(txin.address)
         pubkeys, sig_list = cls.get_siglist(txin, estimate_size=estimate_size)
-        if _type in ['p2wpkh', 'p2wpkh-p2sh']:
+        if _type in ['p2wpkh', 'p2wpkh-p2sh', 'p2pkh']:
             return construct_witness([sig_list[0], pubkeys[0]])
-        elif _type in ['p2wsh', 'p2wsh-p2sh']:
+        elif _type in ['p2wsh', 'p2wsh-p2sh', 'p2sh']:
             witness_script = multisig_script(pubkeys, txin.num_sig)
             return construct_witness([0, *sig_list, witness_script])
         elif _type in ['p2pk', 'p2pkh', 'p2sh']:
@@ -766,6 +766,7 @@ class Transaction:
 
     @classmethod
     def input_script(self, txin: TxInput, *, estimate_size=False) -> str:
+        return ''  # Particl
         if txin.script_sig is not None:
             return txin.script_sig.hex()
         if txin.is_coinbase_input():
@@ -848,6 +849,7 @@ class Transaction:
                                           hashOutputs=hashOutputs)
 
     def is_segwit(self, *, guess_for_address=False):
+        return True  # Particl
         return any(txin.is_segwit(guess_for_address=guess_for_address)
                    for txin in self.inputs())
 
@@ -1560,6 +1562,7 @@ class PartialTxInput(TxInput, PSBTSection):
         return self._is_p2sh_segwit
 
     def is_segwit(self, *, guess_for_address=False) -> bool:
+        return True  # Particl
         if super().is_segwit():
             return True
         if self.is_native_segwit() or self.is_p2sh_segwit():

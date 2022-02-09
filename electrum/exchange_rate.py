@@ -414,7 +414,7 @@ class Biscoint(ExchangeBase):
 class Walltime(ExchangeBase):
 
     async def get_rates(self, ccy):
-        json = await self.get_json('s3.amazonaws.com', 
+        json = await self.get_json('s3.amazonaws.com',
                              '/data-production-walltime-info/production/dynamic/walltime-info.json')
         return {'BRL': Decimal(json['BRL_XBT']['last_inexact'])}
 

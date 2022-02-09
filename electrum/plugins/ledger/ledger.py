@@ -227,7 +227,7 @@ class Ledger_Client(HardwareClientBase):
                 self.perform_hw1_preflight()
             except BTChipException as e:
                 if (e.sw == 0x6d00 or e.sw == 0x6700):
-                    raise UserFacingException(_("Device not in Bitcoin mode")) from e
+                    raise UserFacingException(_("Device not in Particl mode")) from e
                 raise e
             self.preflightDone = True
 
@@ -338,7 +338,7 @@ class Ledger_KeyStore(Hardware_KeyStore):
         # Pad r and s points with 0x00 bytes when the point is small to get valid signature.
         r_padded = bytes([0x00]) * (32 - len(r)) + r
         s_padded = bytes([0x00]) * (32 - len(s)) + s
-        
+
         return bytes([27 + 4 + (signature[0] & 0x01)]) + r_padded + s_padded
 
     @runs_in_hwd_thread
