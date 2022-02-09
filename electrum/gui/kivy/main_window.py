@@ -1437,6 +1437,7 @@ class ElectrumWindow(App, Logger):
             d.open()
 
     def _enable_lightning(self, b):
+        return  #  Particl
         if not b:
             return
         self.wallet.init_lightning(password=self.password)

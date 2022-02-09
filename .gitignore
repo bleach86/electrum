@@ -47,3 +47,6 @@ electrum/*.so.0
 electrum/*.dll
 electrum/*.dylib
 contrib/osx/*.dylib
+
+
+Electrum_Particl.egg-info/

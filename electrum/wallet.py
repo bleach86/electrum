@@ -337,6 +337,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         return bool(self.lnworker)
 
     def can_have_lightning(self) -> bool:
+        return False  # Particl temporary disable lighting
         # we want static_remotekey to be a wallet address
         return self.txin_type == 'p2wpkh'
 
@@ -348,6 +349,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         return self.keystore.can_have_deterministic_lightning_xprv()
 
     def init_lightning(self, *, password) -> None:
+        return  # Particl
         assert self.can_have_lightning()
         assert self.db.get('lightning_xprv') is None
         assert self.db.get('lightning_privkey2') is None
@@ -2893,6 +2895,8 @@ class Deterministic_Wallet(Abstract_Wallet):
         # generate addresses now. note that without libsecp this might block
         # for a few seconds!
         self.synchronize()
+
+        return  # Particl
         # lightning_privkey2 is not deterministic (legacy wallets, bip39)
         ln_xprv = self.db.get('lightning_xprv') or self.db.get('lightning_privkey2')
         # lnworker can only be initialized once receiving addresses are available
