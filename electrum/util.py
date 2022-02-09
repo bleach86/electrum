@@ -87,7 +87,7 @@ base_units = {'PART':8, 'mPART':5, 'bits':2, 'sat':0}
 base_units_inverse = inv_dict(base_units)
 base_units_list = ['PART', 'mPART', 'bits', 'sat']  # list(dict) does not guarantee order
 
-DECIMAL_POINT_DEFAULT = 5  # mPART
+DECIMAL_POINT_DEFAULT = 8  # PART
 
 
 class UnknownBaseUnit(Exception): pass
