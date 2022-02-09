@@ -300,7 +300,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         # If the option hasn't been set yet
         if config.get('check_updates') is None:
-            choice = self.question(title="Electrum - " + _("Enable update check"),
+            choice = self.question(title="Electrum Particl - " + _("Enable update check"),
                                    msg=_("For security reasons we advise that you always use the latest version of Electrum.") + " " +
                                        _("Would you like to be notified when there is a newer version of Electrum available?"))
             config.set_key('check_updates', bool(choice), save=True)
@@ -3442,6 +3442,6 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.showing_cert_mismatch_error = True
         self.show_critical(title=_("Certificate mismatch"),
                            msg=_("The SSL certificate provided by the main server did not match the fingerprint passed in with the --serverfingerprint option.") + "\n\n" +
-                               _("Electrum will now exit."))
+                               _("Electrum Particl will now exit."))
         self.showing_cert_mismatch_error = False
         self.close()

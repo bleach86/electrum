@@ -5,8 +5,8 @@ set -e
 # Parameterize
 PYTHON_VERSION=3.7.9
 BUILDDIR=/tmp/electrum-build
-PACKAGE=Electrum
-GIT_REPO=https://github.com/spesmilo/electrum
+PACKAGE="Electrum Particl"
+GIT_REPO=https://github.com/tecnovert/electrum
 
 export GCC_STRIP_BINARIES="1"
 export PYTHONDONTWRITEBYTECODE=1  # don't create __pycache__/ folders with .pyc files
@@ -179,8 +179,8 @@ pyinstaller --noconfirm --ascii --clean --name $VERSION contrib/osx/osx.spec || 
 
 info "Adding bitcoin URI types to Info.plist"
 plutil -insert 'CFBundleURLTypes' \
-	-xml '<array><dict> <key>CFBundleURLName</key> <string>bitcoin</string> <key>CFBundleURLSchemes</key> <array><string>bitcoin</string><string>lightning</string></array> </dict></array>' \
-	-- dist/$PACKAGE.app/Contents/Info.plist \
+	-xml '<array><dict> <key>CFBundleURLName</key> <string>particl</string> <key>CFBundleURLSchemes</key> <array><string>particl</string><string>lightning</string></array> </dict></array>' \
+	-- "dist/$PACKAGE.app/Contents/Info.plist" \
 	|| fail "Could not add keys to Info.plist. Make sure the program 'plutil' exists and is installed."
 
 DoCodeSignMaybe "app bundle" "dist/${PACKAGE}.app"
@@ -195,7 +195,7 @@ if [ ! -z "$CODESIGN_CERT" ]; then
 fi
 
 info "Creating .DMG"
-hdiutil create -fs HFS+ -volname $PACKAGE -srcfolder dist/$PACKAGE.app dist/electrum-$VERSION.dmg || fail "Could not create .DMG"
+hdiutil create -fs HFS+ -volname "$PACKAGE" -srcfolder "dist/$PACKAGE.app" dist/electrum-$VERSION.dmg || fail "Could not create .DMG"
 
 DoCodeSignMaybe ".DMG" "dist/electrum-${VERSION}.dmg"
 

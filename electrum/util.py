@@ -557,12 +557,14 @@ def user_dir():
         return os.environ["ELECTRUMDIR"]
     elif 'ANDROID_DATA' in os.environ:
         return android_data_dir()
+    if sys.platform == 'darwin':
+        return os.path.join(os.environ["HOME"], "Library", "Application Support", "particl-electrum")
     elif os.name == 'posix':
         return os.path.join(os.environ["HOME"], ".particl-electrum")
     elif "APPDATA" in os.environ:
-        return os.path.join(os.environ["APPDATA"], "ParticlElectrum")
+        return os.path.join(os.environ["APPDATA"], "particl-electrum")
     elif "LOCALAPPDATA" in os.environ:
-        return os.path.join(os.environ["LOCALAPPDATA"], "ParticlElectrum")
+        return os.path.join(os.environ["LOCALAPPDATA"], "particl-electrum")
     else:
         #raise Exception("No home directory found in environment variables.")
         return
