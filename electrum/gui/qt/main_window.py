@@ -776,9 +776,10 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # help_menu.addAction(_("&Check for updates"), self.show_update_check) # Particl TODO
         help_menu.addAction(_("&Official website"), lambda: webopen("https://particl.io"))
         help_menu.addSeparator()
-        help_menu.addAction(_("&Documentation"), lambda: webopen("http://docs.electrum.org/")).setShortcut(QKeySequence.HelpContents)
-        if not constants.net.TESTNET:
-            help_menu.addAction(_("&Bitcoin Paper"), self.show_bitcoin_paper)
+        help_menu.addAction(_("&Electrum Documentation"), lambda: webopen("http://docs.electrum.org/")).setShortcut(QKeySequence.HelpContents)
+        help_menu.addAction(_("&PART Coin Explained"), lambda: webopen("https://academy.particl.io/en/latest/in-depth/indepth_part_coin.html"))
+        help_menu.addAction(_("&Particl Academy"), lambda: webopen("https://academy.particl.io"))
+        help_menu.addAction(_("&Particl Wiki"), lambda: webopen("https://particl.wiki"))
         help_menu.addAction(_("&Report Bug"), self.show_report_bug)
         help_menu.addSeparator()
         help_menu.addAction(_("&Donate to server"), self.donate_to_server)
@@ -791,7 +792,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             host = self.network.get_parameters().server.host
             self.pay_to_URI('particl:%s?message=donation for %s'%(d, host))
         else:
-            self.show_error(_('No donation address for this server'))
+            self.show_error(_('No donation address for this server') +
+                            _('\n\nConsider donating to the Particl Treasury, address: RQYUDd3EJohpjq62So4ftcV5XZfxZxJPe9'))
 
     def show_about(self):
         QMessageBox.about(self, "Electrum Particl",
@@ -825,6 +827,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             _("Before reporting a bug, upgrade to the most recent version of Electrum (latest release or git HEAD), and include the version number in your report."),
             _("Try to explain not only what the bug is, but how it occurs.")
          ])
+
+        if self.config.get('log_to_file', False):
+            msg += ' <br/><br/>' + _("Logfiles can be found in: ") + util.user_dir()
         self.show_message(msg, title="Electrum Particl - " + _("Reporting Bugs"), rich_text=True)
 
     def notify_transactions(self):
