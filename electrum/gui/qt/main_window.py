@@ -298,6 +298,9 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         gui_object.timer.timeout.connect(self.timer_actions)
         self.fetch_alias()
 
+        self._update_check_thread = None
+        '''
+        Particl TODO
         # If the option hasn't been set yet
         if config.get('check_updates') is None:
             choice = self.question(title="Electrum Particl - " + _("Enable update check"),
@@ -317,6 +320,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
             self._update_check_thread = UpdateCheckThread()
             self._update_check_thread.checked.connect(on_version_received)
             self._update_check_thread.start()
+        '''
 
     def run_coroutine_from_thread(self, coro, on_result=None):
         def task():
@@ -769,8 +773,8 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         help_menu = menubar.addMenu(_("&Help"))
         help_menu.addAction(_("&About"), self.show_about)
-        help_menu.addAction(_("&Check for updates"), self.show_update_check)
-        help_menu.addAction(_("&Official website"), lambda: webopen("https://electrum.org"))
+        # help_menu.addAction(_("&Check for updates"), self.show_update_check) # Particl TODO
+        help_menu.addAction(_("&Official website"), lambda: webopen("https://particl.io"))
         help_menu.addSeparator()
         help_menu.addAction(_("&Documentation"), lambda: webopen("http://docs.electrum.org/")).setShortcut(QKeySequence.HelpContents)
         if not constants.net.TESTNET:
@@ -1469,7 +1473,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         # show tooltip explaining max amount
         mining_fee = tx.get_fee()
         mining_fee_str = self.format_amount_and_units(mining_fee)
-        msg = _("Mining fee: {} (can be adjusted on next screen)").format(mining_fee_str)
+        msg = _("Transaction fee: {} (can be adjusted on next screen)").format(mining_fee_str)
         if x_fee_amount:
             twofactor_fee_str = self.format_amount_and_units(x_fee_amount)
             msg += "\n" + _("2fa fee: {} (for the next batch of transactions)").format(twofactor_fee_str)
