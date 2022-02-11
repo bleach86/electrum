@@ -115,7 +115,7 @@ class TxOutput:
         return cls(scriptpubkey=bfh(bitcoin.address_to_script(address)),
                    value=value)
 
-    def serialize_for_sighash(self) -> bytes:
+    def serialize_for_sighash(self, include_sigs=True) -> bytes:
         buf = bytes()
         if self.output_type == OUTPUT_STANDARD:
             buf += int.to_bytes(self.value, 8, byteorder="little", signed=False)
@@ -126,25 +126,31 @@ class TxOutput:
             buf += self.commitment
             buf += bfh(var_int(len(self.data)))
             buf += self.data
-            buf += bfh(var_int(len(self.script)))
-            buf += self.script
-            buf += bfh(var_int(len(self.rangeproof)))
-            buf += self.rangeproof
+            buf += bfh(var_int(len(self.scriptpubkey)))
+            buf += self.scriptpubkey
+            if include_sigs:
+                buf += bfh(var_int(len(self.rangeproof)))
+                buf += self.rangeproof
+            else:
+                buf += bfh(var_int(0))
         elif self.output_type == OUTPUT_RINGCT:
             buf += self.pubkey
             buf += self.commitment
             buf += bfh(var_int(len(self.data)))
             buf += self.data
-            buf += bfh(var_int(len(self.rangeproof)))
-            buf += self.rangeproof
+            if include_sigs:
+                buf += bfh(var_int(len(self.rangeproof)))
+                buf += self.rangeproof
+            else:
+                buf += bfh(var_int(0))
         elif self.output_type == OUTPUT_DATA:
             buf += bfh(var_int(len(self.data)))
             buf += self.data
         return buf
 
-    def serialize_to_network(self) -> bytes:
+    def serialize_to_network(self, include_sigs=True) -> bytes:
         buf = bytes((self.output_type, ))
-        return buf + self.serialize_for_sighash()
+        return buf + self.serialize_for_sighash(include_sigs)
 
     @classmethod
     def from_network_bytes(cls, raw: bytes) -> 'TxOutput':
@@ -232,6 +238,7 @@ class TxInput:
     prevout: TxOutpoint
     script_sig: Optional[bytes]
     nsequence: int
+    script_data: Optional[bytes]
     witness: Optional[bytes]
     _is_coinbase_output: bool
 
@@ -240,12 +247,14 @@ class TxInput:
                  script_sig: bytes = None,
                  nsequence: int = 0xffffffff - 1,
                  witness: bytes = None,
-                 is_coinbase_output: bool = False):
+                 is_coinbase_output: bool = False,
+                 script_data: bytes = None,):
         self.prevout = prevout
         self.script_sig = script_sig
         self.nsequence = nsequence
         self.witness = witness
         self._is_coinbase_output = is_coinbase_output
+        self.script_data = script_data
 
     def is_coinbase_input(self) -> bool:
         """Whether this is the input of a coinbase tx."""
@@ -269,6 +278,8 @@ class TxInput:
         }
         if self.script_sig is not None:
             d['scriptSig'] = self.script_sig.hex()
+        if self.script_data is not None:
+            d['script_data'] = self.script_data.hex()
         if self.witness is not None:
             d['witness'] = self.witness.hex()
         return d
@@ -536,10 +547,11 @@ def parse_input(vds: BCDataStream) -> TxInput:
     script_sig = vds.read_bytes(vds.read_compact_size())
     nsequence = vds.read_uint32()
 
+    script_data = None
     if prevout_n == 0xffffffa0:
         n = vds.read_compact_size()
-        script_data = list(vds.read_bytes(vds.read_compact_size()) for i in range(n))
-    return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence)
+        script_data = bfh(construct_witness(list(vds.read_bytes(vds.read_compact_size()) for i in range(n))))
+    return TxInput(prevout=prevout, script_sig=script_sig, nsequence=nsequence, script_data=script_data)
 
 
 def parse_witness(vds: BCDataStream, txin: TxInput) -> None:
@@ -564,7 +576,7 @@ def parse_output(vds: BCDataStream) -> TxOutput:
         txo.output_type = output_type
         txo.commitment = vds.read_bytes(33)
         txo.data = vds.read_bytes(vds.read_compact_size())
-        txo.pk_script = vds.read_bytes(vds.read_compact_size())
+        txo.scriptpubkey = vds.read_bytes(vds.read_compact_size())
         txo.rangeproof = vds.read_bytes(vds.read_compact_size())
         return txo
     elif output_type == OUTPUT_RINGCT:
@@ -836,6 +848,8 @@ class Transaction:
         s += var_int(len(script)//2)
         s += script
         s += int_to_hex(txin.nsequence, 4)
+        if txin.script_data is not None:
+            s += txin.script_data.hex()
         return s
 
     def _calc_bip143_shared_txdigest_fields(self) -> BIP143SharedTxDigestFields:
@@ -883,7 +897,7 @@ class Transaction:
             return ''
         txins = var_int(len(inputs)) + ''.join(self.serialize_input(txin, create_script_sig(txin))
                                                for txin in inputs)
-        txouts = var_int(len(outputs)) + ''.join(o.serialize_to_network().hex() for o in outputs)
+        txouts = var_int(len(outputs)) + ''.join(o.serialize_to_network(include_sigs).hex() for o in outputs)
 
         use_segwit_ser_for_estimate_size = estimate_size and self.is_segwit(guess_for_address=True)
         use_segwit_ser_for_actual_use = not estimate_size and self.is_segwit()
