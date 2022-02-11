@@ -16,12 +16,12 @@ home = 'C:\\electrum\\'
 hiddenimports = []
 hiddenimports += collect_submodules('pkg_resources')  # workaround for https://github.com/pypa/setuptools/issues/1963
 hiddenimports += collect_submodules('trezorlib')
-hiddenimports += collect_submodules('safetlib')
+#hiddenimports += collect_submodules('safetlib')
 hiddenimports += collect_submodules('btchip')
-hiddenimports += collect_submodules('keepkeylib')
+#hiddenimports += collect_submodules('keepkeylib')
 hiddenimports += collect_submodules('websocket')
 hiddenimports += collect_submodules('ckcc')
-hiddenimports += collect_submodules('bitbox02')
+#hiddenimports += collect_submodules('bitbox02')
 hiddenimports += ['PyQt5.QtPrintSupport']  # needed by Revealer
 
 
@@ -62,13 +62,13 @@ a = Analysis([home+'run_electrum',
               home+'electrum/dnssec.py',
               home+'electrum/commands.py',
               home+'electrum/plugins/cosigner_pool/qt.py',
-              home+'electrum/plugins/email_requests/qt.py',
+              #home+'electrum/plugins/email_requests/qt.py',
               home+'electrum/plugins/trezor/qt.py',
-              home+'electrum/plugins/safe_t/client.py',
-              home+'electrum/plugins/safe_t/qt.py',
-              home+'electrum/plugins/keepkey/qt.py',
+              #home+'electrum/plugins/safe_t/client.py',
+              #home+'electrum/plugins/safe_t/qt.py',
+              #home+'electrum/plugins/keepkey/qt.py',
               home+'electrum/plugins/ledger/qt.py',
-              home+'electrum/plugins/coldcard/qt.py',
+              #home+'electrum/plugins/coldcard/qt.py',
               #home+'packages/requests/utils.py'
               ],
              binaries=binaries,

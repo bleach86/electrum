@@ -24,12 +24,12 @@ block_cipher = None
 hiddenimports = []
 hiddenimports += collect_submodules('pkg_resources')  # workaround for https://github.com/pypa/setuptools/issues/1963
 hiddenimports += collect_submodules('trezorlib')
-hiddenimports += collect_submodules('safetlib')
+#hiddenimports += collect_submodules('safetlib')
 hiddenimports += collect_submodules('btchip')
-hiddenimports += collect_submodules('keepkeylib')
+#hiddenimports += collect_submodules('keepkeylib')
 hiddenimports += collect_submodules('websocket')
 hiddenimports += collect_submodules('ckcc')
-hiddenimports += collect_submodules('bitbox02')
+#hiddenimports += collect_submodules('bitbox02')
 hiddenimports += ['PyQt5.QtPrintSupport']  # needed by Revealer
 
 datas = [
@@ -42,11 +42,11 @@ datas = [
     (electrum + PYPKG + '/gui/icons', PYPKG + '/gui/icons'),
 ]
 datas += collect_data_files('trezorlib')
-datas += collect_data_files('safetlib')
+#datas += collect_data_files('safetlib')
 datas += collect_data_files('btchip')
-datas += collect_data_files('keepkeylib')
+#datas += collect_data_files('keepkeylib')
 datas += collect_data_files('ckcc')
-datas += collect_data_files('bitbox02')
+#datas += collect_data_files('bitbox02')
 
 # Add libusb so Trezor and Safe-T mini will work
 binaries = [(electrum + "contrib/osx/libusb-1.0.dylib", ".")]
@@ -68,13 +68,13 @@ a = Analysis([electrum+ MAIN_SCRIPT,
               electrum+'electrum/dnssec.py',
               electrum+'electrum/commands.py',
               electrum+'electrum/plugins/cosigner_pool/qt.py',
-              electrum+'electrum/plugins/email_requests/qt.py',
+              #electrum+'electrum/plugins/email_requests/qt.py',
               electrum+'electrum/plugins/trezor/qt.py',
-              electrum+'electrum/plugins/safe_t/client.py',
-              electrum+'electrum/plugins/safe_t/qt.py',
-              electrum+'electrum/plugins/keepkey/qt.py',
+              #electrum+'electrum/plugins/safe_t/client.py',
+              #electrum+'electrum/plugins/safe_t/qt.py',
+              #electrum+'electrum/plugins/keepkey/qt.py',
               electrum+'electrum/plugins/ledger/qt.py',
-              electrum+'electrum/plugins/coldcard/qt.py',
+              #electrum+'electrum/plugins/coldcard/qt.py',
               ],
              binaries=binaries,
              datas=datas,
