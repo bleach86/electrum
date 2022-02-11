@@ -99,8 +99,8 @@ class ParticlMainnet(AbstractNet):
         'p2wsh':       0x988e0b6a,  # ZPPA
     }
     XPUB_HEADERS_INV = inv_dict(XPUB_HEADERS)
-    BIP44_COIN_TYPE = 0
-    LN_REALM_BYTE = 0
+    BIP44_COIN_TYPE = 44
+    LN_REALM_BYTE = 44
     LN_DNS_SEEDS = [
     ]
 
