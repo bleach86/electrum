@@ -425,7 +425,7 @@ def android_ext_dir():
     return primary_external_storage_path()
 
 def android_backup_dir():
-    d = os.path.join(android_ext_dir(), 'org.electrum.electrum')
+    d = os.path.join(android_ext_dir(), 'io.particl.electrumparticl')
     if not os.path.exists(d):
         os.mkdir(d)
     return d
@@ -867,7 +867,7 @@ def block_explorer_URL(config: 'SimpleConfig', kind: str, item: str) -> Optional
 
 # note: when checking against these, use .lower() to support case-insensitivity
 BITCOIN_BIP21_URI_SCHEME = 'particl'
-LIGHTNING_URI_SCHEME = 'lightning'
+LIGHTNING_URI_SCHEME = 'partlightning'
 
 
 class InvalidBitcoinURI(Exception): pass
