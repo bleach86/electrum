@@ -556,6 +556,8 @@ def parse_input(vds: BCDataStream) -> TxInput:
 
 def parse_witness(vds: BCDataStream, txin: TxInput) -> None:
     n = vds.read_compact_size()
+    if n == 0:
+        return
     witness_elements = list(vds.read_bytes(vds.read_compact_size()) for i in range(n))
     txin.witness = bfh(construct_witness(witness_elements))
 
@@ -879,7 +881,7 @@ class Transaction:
     def serialize_as_bytes(self) -> bytes:
         return bfh(self.serialize())
 
-    def serialize_to_network(self, *, estimate_size=False, include_sigs=True, force_legacy=False) -> str:
+    def serialize_to_network(self, *, estimate_size=False, include_sigs=True, force_legacy=False, for_psbt=False) -> str:
         """Serialize the transaction as used on the Bitcoin network, into hex.
         `include_sigs` signals whether to include scriptSigs and witnesses.
         `force_legacy` signals to use the pre-segwit format
@@ -907,6 +909,10 @@ class Transaction:
             witness = ''.join(self.serialize_witness(x, estimate_size=estimate_size) for x in inputs)
             return nVersion + nLocktime + txins + txouts + witness
         else:
+            if for_psbt:
+                # Particl txns are only serialised without input witness data for the txid
+                witness = ''.join(construct_witness([]) for x in inputs)
+                return nVersion + nLocktime + txins + txouts + witness
             return nVersion + nLocktime + txins + txouts
 
     def to_qr_data(self) -> str:
@@ -1822,7 +1828,7 @@ class PartialTransaction(Transaction):
         wr = PSBTSection.create_psbt_writer(fd)
         fd.write(b'psbt\xff')
         # global section
-        wr(PSBTGlobalType.UNSIGNED_TX, bfh(self.serialize_to_network(include_sigs=False)))
+        wr(PSBTGlobalType.UNSIGNED_TX, bfh(self.serialize_to_network(include_sigs=False, for_psbt=True)))
         for bip32node, (xfp, path) in sorted(self.xpubs.items()):
             val = pack_bip32_root_fingerprint_and_int_path(xfp, path)
             wr(PSBTGlobalType.XPUB, val, key=bip32node.to_bytes())
