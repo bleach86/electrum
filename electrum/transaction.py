@@ -260,6 +260,11 @@ class TxInput:
         """Whether this is the input of a coinbase tx."""
         return self.prevout.is_coinbase()
 
+    ANON_MARKER = 0xffffffa0
+
+    def is_anon_input(self) -> bool:
+        return self.prevout.out_idx == self.ANON_MARKER
+
     def is_coinbase_output(self) -> bool:
         """Whether the coin being spent is an output of a coinbase tx.
         This matters for coin maturity.

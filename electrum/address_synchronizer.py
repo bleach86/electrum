@@ -222,6 +222,8 @@ class AddressSynchronizer(Logger):
         conflicting_txns = set()
         with self.transaction_lock:
             for txin in tx.inputs():
+                if txin.is_anon_input():
+                    continue
                 if txin.is_coinbase_input():
                     continue
                 prevout_hash = txin.prevout.txid.hex()

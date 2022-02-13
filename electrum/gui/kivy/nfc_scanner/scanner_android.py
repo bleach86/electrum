@@ -165,20 +165,20 @@ class ScannerAndroid(NFCBase):
     def create_AAR(self):
         '''Create the record responsible for linking our application to the tag.
         '''
-        return NdefRecord.createApplicationRecord(JString("io.particl.kivy"))
+        return NdefRecord.createApplicationRecord(JString("org.electrum.kivy"))
 
     def create_TNF_EXTERNAL(self, data):
         '''Create our actual payload record.
         '''
         if BUILDVERSION >= 14:
-            domain = "io.particl"
+            domain = "org.electrum"
             stype = "externalType"
             extRecord = NdefRecord.createExternal(domain, stype, data)
         else:
             # Creating the NdefRecord manually:
             extRecord = NdefRecord(
                 NdefRecord.TNF_EXTERNAL_TYPE,
-                "io.particl:externalType",
+                "org.electrum:externalType",
                 '',
                 data)
         return extRecord
@@ -213,7 +213,7 @@ class ScannerAndroid(NFCBase):
         # Create record
         ndef_record = NdefRecord(
                 NdefRecord.TNF_MIME_MEDIA,
-                'io.particl.kivy', '', data)
+                'org.electrum.kivy', '', data)
 
         # Create message
         ndef_message = NdefMessage([ndef_record])

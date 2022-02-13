@@ -126,7 +126,7 @@ android.add_src = electrum/gui/kivy/data/java-classes/
 
 android.gradle_dependencies = me.dm7.barcodescanner:zxing:1.9.8
 
-android.add_activities = io.particl.electrumparticl.qr.SimpleScannerActivity
+android.add_activities = org.electrum.qr.SimpleScannerActivity
 
 # (str) python-for-android branch to use, if not master, useful to try
 # not yet merged features.
@@ -204,7 +204,7 @@ p4a.local_recipes = %(source.dir)s/contrib/android/p4a_recipes/
 [buildozer]
 
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
-log_level = 1
+log_level = 2
 
 # (str) Path to build output (i.e. .apk, .ipa) storage
 bin_dir = ./dist
