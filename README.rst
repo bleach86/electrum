@@ -1,4 +1,4 @@
-Electrum - Lightweight Particl client
+Electrum Particl - Lightweight Particl client
 =====================================
 
 ::

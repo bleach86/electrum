@@ -89,9 +89,9 @@ setup(
     scripts=['electrum/electrum'],
     data_files=data_files,
     description="Lightweight Particl Wallet",
-    author="Thomas Voegtlin",
-    author_email="thomasv@electrum.org",
+    author="Thomas Voegtlin, Particl Devs",
+    author_email="hello@particl.io",
     license="MIT Licence",
-    url="https://electrum.org",
+    url="https://particl.io",
     long_description="""Lightweight Particl Wallet""",
 )
