@@ -978,6 +978,12 @@ class Commands:
         return wallet.is_up_to_date()
 
     @command('n')
+    async def export_checkpoints(self):
+        path = '/tmp/electrum_checkpoints'
+        self.network.export_checkpoints(path)
+        return 'Wrote checkpoints to: ' + path
+
+    @command('n')
     async def getfeerate(self, fee_method=None, fee_level=None):
         """Return current suggested fee rate (in sat/kvByte), according to config
         settings or supplied parameters.
