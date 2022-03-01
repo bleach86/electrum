@@ -49,7 +49,7 @@ from .bitcoin import (TYPE_ADDRESS, TYPE_SCRIPT, hash_160,
                       int_to_hex, push_script, b58_address_to_hash160,
                       opcodes, add_number_to_script, base_decode, is_segwit_script_type,
                       base_encode, construct_witness, construct_script)
-from .crypto import sha256d
+from .crypto import sha256d, ripemd
 from .logging import get_logger
 
 if TYPE_CHECKING:
@@ -63,6 +63,8 @@ OUTPUT_STANDARD = 1
 OUTPUT_CT = 2
 OUTPUT_RINGCT = 3
 OUTPUT_DATA = 4
+PARTICL_TXN_VERSION = 0xa0
+PARTICL_TXN_COINSTAKE = 2
 
 
 class SerializationError(Exception):
@@ -478,6 +480,16 @@ SCRIPTPUBKEY_TEMPLATE_WITNESS_V0 = [opcodes.OP_0, OPPushDataGeneric(lambda x: x 
 SCRIPTPUBKEY_TEMPLATE_P2WPKH = [opcodes.OP_0, OPPushDataGeneric(lambda x: x == 20)]
 SCRIPTPUBKEY_TEMPLATE_P2WSH = [opcodes.OP_0, OPPushDataGeneric(lambda x: x == 32)]
 
+SCRIPTPUBKEY_TEMPLATE_P2PKH_256 = [opcodes.OP_DUP, opcodes.OP_SHA256,
+                               OPPushDataGeneric(lambda x: x == 32),
+                               opcodes.OP_EQUALVERIFY, opcodes.OP_CHECKSIG]
+SCRIPTPUBKEY_TEMPLATE_P2PKH_CS = [opcodes.OP_ISCOINSTAKE, opcodes.OP_IF, opcodes.OP_DUP, opcodes.OP_HASH160,
+                               OPPushDataGeneric(lambda x: x == 20),
+                               opcodes.OP_EQUALVERIFY, opcodes.OP_CHECKSIG,
+                               opcodes.OP_ELSE, opcodes.OP_DUP, opcodes.OP_SHA256,
+                               OPPushDataGeneric(lambda x: x == 32),
+                               opcodes.OP_EQUALVERIFY, opcodes.OP_CHECKSIG, opcodes.OP_ENDIF]
+
 
 def match_script_against_template(script, template) -> bool:
     """Returns whether 'script' matches 'template'."""
@@ -515,6 +527,10 @@ def get_script_type_from_output_script(_bytes: bytes) -> Optional[str]:
         return 'p2wpkh'
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2WSH):
         return 'p2wsh'
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH_256):
+        return 'p2pkh_256'
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH_CS):
+        return 'p2pkh_cs'
     return None
 
 def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
@@ -530,6 +546,14 @@ def get_address_from_output_script(_bytes: bytes, *, net=None) -> Optional[str]:
     # p2sh
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2SH):
         return hash160_to_p2sh(decoded[1][1], net=net)
+
+    # p2pkh coldstake
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH_CS):
+        return hash160_to_p2pkh(ripemd(decoded[10][1]), net=net)
+
+    # p2pkh 256
+    if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_P2PKH_256):
+        return hash160_to_p2pkh(ripemd(decoded[2][1]), net=net)
 
     # segwit address (version 0)
     if match_script_against_template(decoded, SCRIPTPUBKEY_TEMPLATE_WITNESS_V0):
@@ -631,7 +655,7 @@ class Transaction:
         self._inputs = None  # type: List[TxInput]
         self._outputs = None  # type: List[TxOutput]
         self._locktime = 0
-        self._version = 0xa0
+        self._version = PARTICL_TXN_VERSION
 
         self._cached_txid = None  # type: Optional[str]
 
@@ -664,6 +688,10 @@ class Transaction:
             'outputs': [txout.to_json() for txout in self.outputs()],
         }
         return d
+
+    def is_coinstake(self) -> bool:
+        self.deserialize()
+        return (self._version & 0xFF) == PARTICL_TXN_VERSION and ((self._version >> 8) & 0xFF) == PARTICL_TXN_COINSTAKE;
 
     def inputs(self) -> Sequence[TxInput]:
         if self._inputs is None:
@@ -751,7 +779,7 @@ class Transaction:
         if _type in ('address', 'unknown') and estimate_size:
             _type = cls.guess_txintype_from_address(txin.address)
         pubkeys, sig_list = cls.get_siglist(txin, estimate_size=estimate_size)
-        if _type in ['p2wpkh', 'p2wpkh-p2sh', 'p2pkh']:
+        if _type in ['p2wpkh', 'p2wpkh-p2sh', 'p2pkh', 'p2pkh_256', 'p2pkh_cs']:
             return construct_witness([sig_list[0], pubkeys[0]])
         elif _type in ['p2wsh', 'p2wsh-p2sh', 'p2sh']:
             witness_script = multisig_script(pubkeys, txin.num_sig)
@@ -844,6 +872,8 @@ class Transaction:
         elif txin.script_type == 'p2pk':
             pubkey = pubkeys[0]
             return bitcoin.public_key_to_p2pk_script(pubkey)
+        elif txin.script_type in ['p2pkh_256', 'p2pkh_cs']:
+            return txin.utxo.outputs()[txin.prevout.out_idx].scriptpubkey.hex()
         else:
             raise UnknownTxinType(f'cannot construct preimage_script for txin_type: {txin.script_type}')
 
@@ -1321,6 +1351,14 @@ class PartialTxInput(TxInput, PSBTSection):
                 raise PSBTInputConsistencyFailure(f"PSBT input validation: "
                                                   f"If a non-witness UTXO is provided, its hash must match the hash specified in the prevout")
             if self.witness_utxo:
+                # Particl set 256bit or coldstake script from prevout script, witness_utxo was constructed from address
+                utxo = self.utxo.outputs()[self.prevout.out_idx]
+                if utxo != self.witness_utxo:
+                    script_type = get_script_type_from_output_script(utxo.scriptpubkey)
+                    if script_type in ('p2pkh_256', 'p2pkh_cs'):
+                        self.witness_utxo.scriptpubkey = utxo.scriptpubkey
+                        self.witness_utxo.script_type = script_type
+                        self.script_type = script_type
                 if self.utxo.outputs()[self.prevout.out_idx] != self.witness_utxo:
                     raise PSBTInputConsistencyFailure(f"PSBT input validation: "
                                                       f"If both non-witness UTXO and witness UTXO are provided, they must be consistent")
@@ -1493,7 +1531,7 @@ class PartialTxInput(TxInput, PSBTSection):
         #       that are related to the wallet.
         #       The 'fix' would be adding extra logic that matches on templates,
         #       and figures out the script_type from available fields.
-        if self.script_type in ('p2pk', 'p2pkh', 'p2wpkh', 'p2wpkh-p2sh'):
+        if self.script_type in ('p2pk', 'p2pkh', 'p2wpkh', 'p2wpkh-p2sh', 'p2pkh_256', 'p2pkh_cs'):
             return s >= 1
         if self.script_type in ('p2sh', 'p2wsh', 'p2wsh-p2sh'):
             return s >= self.num_sig

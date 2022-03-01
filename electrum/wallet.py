@@ -1920,7 +1920,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             if not is_mine:
                 return
         # set script_type first, as later checks might rely on it:
-        txin.script_type = self.get_txin_type(address)
+        if txin.script_type in ('unknown', 'address'):  # Particl: don't overwrite existing type
+            txin.script_type = self.get_txin_type(address)
         txin.num_sig = self.m if isinstance(self, Multisig_Wallet) else 1
         if txin.redeem_script is None:
             try:
