@@ -419,7 +419,7 @@ class BaseWizard(Logger):
             # There is no general standard for HD multisig.
             # For legacy, this is partially compatible with BIP45; assumes index=0
             # For segwit, a custom path is used, as there is no standard at all.
-            default_choice_idx = 2
+            default_choice_idx = 0
             choices = [
                 ('standard',   'legacy multisig (p2sh)',            legacy_multisig_derivation(0)),
                 #('standard',   'legacy multisig (p2sh)',            normalize_bip32_derivation("m/45'/0")),
@@ -435,7 +435,7 @@ class BaseWizard(Logger):
                 default_choice_idx = chosen_idx
                 hide_choices = True
         else:
-            default_choice_idx = 2
+            default_choice_idx = 0
             choices = [
                 ('standard',    'legacy (p2pkh)',            bip44_derivation(0, bip43_purpose=44)),
                 #('p2wpkh-p2sh', 'p2sh-segwit (p2wpkh-p2sh)', bip44_derivation(0, bip43_purpose=49)),
