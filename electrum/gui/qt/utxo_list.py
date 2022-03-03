@@ -33,6 +33,8 @@ from PyQt5.QtWidgets import QAbstractItemView, QMenu, QLabel, QHBoxLayout
 
 from electrum.i18n import _
 from electrum.transaction import PartialTxInput
+from electrum.bitcoin import opcodes, EncodeBase58Check
+from electrum import constants, segwit_addr
 
 from .util import MyTreeView, ColorScheme, MONOSPACE_FONT, EnterButton
 
@@ -47,6 +49,7 @@ class UTXOList(MyTreeView):
         LABEL = 2
         AMOUNT = 3
         HEIGHT = 4
+        STAKE_ADDRESS = 5
 
     headers = {
         Columns.ADDRESS: _('Address'),
@@ -54,6 +57,7 @@ class UTXOList(MyTreeView):
         Columns.AMOUNT: _('Amount'),
         Columns.HEIGHT: _('Height'),
         Columns.OUTPOINT: _('Output point'),
+        Columns.STAKE_ADDRESS: _('Stake Address'),
     }
     filter_columns = [Columns.ADDRESS, Columns.LABEL, Columns.OUTPOINT]
     stretch_column = Columns.LABEL
@@ -101,7 +105,17 @@ class UTXOList(MyTreeView):
         self._utxo_dict[name] = utxo
         label = self.wallet.get_label_for_txid(utxo.prevout.txid.hex()) or self.wallet.get_label(address)
         amount = self.parent.format_amount(utxo.value_sats(), whitespaces=True)
-        labels = [name_short, address, label, amount, '%d'%height]
+
+        stakeaddress = ''
+        full_tx = self.wallet.get_input_tx(utxo.prevout.txid.hex(), local_only_lookup=True)
+        scriptpubkey = full_tx.outputs()[utxo.prevout.out_idx].scriptpubkey
+        if len(scriptpubkey) == 66 and scriptpubkey[0] == opcodes.OP_ISCOINSTAKE:
+            stake_hash = scriptpubkey[5: 5 + 20]
+            stakeaddress = segwit_addr.bech32_encode(segwit_addr.Encoding.BECH32, constants.net.STAKE_ONLY_PKADDR_HRP, segwit_addr.convertbits(stake_hash, 8, 5))
+            spend_hash = scriptpubkey[31:31 + 32]
+            address = EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + spend_hash)
+
+        labels = [name_short, address, label, amount, '%d'%height, stakeaddress]
         utxo_item = [QStandardItem(x) for x in labels]
         self.set_editability(utxo_item)
         utxo_item[self.Columns.OUTPOINT].setData(name, self.ROLE_CLIPBOARD_DATA)
@@ -109,6 +123,7 @@ class UTXOList(MyTreeView):
         utxo_item[self.Columns.ADDRESS].setFont(QFont(MONOSPACE_FONT))
         utxo_item[self.Columns.AMOUNT].setFont(QFont(MONOSPACE_FONT))
         utxo_item[self.Columns.OUTPOINT].setFont(QFont(MONOSPACE_FONT))
+        utxo_item[self.Columns.STAKE_ADDRESS].setFont(QFont(MONOSPACE_FONT))
         SELECTED_TO_SPEND_TOOLTIP = _('Coin selected to be spent')
         if name in (self._spend_set or set()):
             for col in utxo_item:

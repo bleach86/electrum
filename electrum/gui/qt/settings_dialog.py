@@ -30,13 +30,15 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QComboBox,  QTabWidget,
                              QSpinBox,  QFileDialog, QCheckBox, QLabel,
                              QVBoxLayout, QGridLayout, QLineEdit,
-                             QPushButton, QWidget, QHBoxLayout)
+                             QPushButton, QWidget, QHBoxLayout, QMessageBox)
 
 from electrum.i18n import _, languages
 from electrum import util, coinchooser, paymentrequest
 from electrum.util import base_units_list
-
+from electrum.gui.qt.util import custom_message_box
 from electrum.gui import messages
+from electrum.wallet import decode_cs_changeaddress
+
 
 from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
                    CloseButton)
@@ -62,6 +64,7 @@ class SettingsDialog(WindowModalDialog):
         gui_widgets = []
         tx_widgets = []
         oa_widgets = []
+        cs_widgets = []
 
         # language
         lang_help = _('Select which language is used in the GUI (after restart).')
@@ -189,6 +192,15 @@ class SettingsDialog(WindowModalDialog):
         self.set_alias_color()
         self.alias_e.editingFinished.connect(self.on_alias_edit)
         oa_widgets.append((alias_label, self.alias_e))
+
+        msg = _('Coldstaking changeaddress.') + '\n\n'\
+              + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
+        cs_changeaddress_label = HelpLabel(_('Coldstaking change address') + ':', msg)
+        cs_changeaddress = self.config.get('cs_changeaddress','')
+        self.cs_changeaddress_e = QLineEdit(cs_changeaddress)
+        self.set_cs_changeaddress_color()
+        self.cs_changeaddress_e.editingFinished.connect(self.on_cs_changeaddress_edit)
+        cs_widgets.append((cs_changeaddress_label, self.cs_changeaddress_e))
 
         msat_cb = QCheckBox(_("Show amounts with msat precision"))
         msat_cb.setChecked(bool(self.config.get('amt_precision_post_satoshi', False)))
@@ -507,6 +519,7 @@ class SettingsDialog(WindowModalDialog):
             (lightning_widgets, _('Lightning')),
             (fiat_widgets, _('Fiat')),
             (oa_widgets, _('OpenAlias')),
+            (cs_widgets, _('ColdStaking')),
         ]
         for widgets, name in tabs_info:
             tab = QWidget()
@@ -545,3 +558,40 @@ class SettingsDialog(WindowModalDialog):
         self.config.set_key('alias', alias, True)
         if alias:
             self.window.fetch_alias()
+
+    def set_cs_changeaddress_color(self):
+        if not self.config.get('cs_changeaddress'):
+            self.alias_e.setStyleSheet("")
+            return
+        cs_changeaddress = str(self.cs_changeaddress_e.text())
+
+        valid_addr = False
+        if cs_changeaddress != '':
+            try:
+                decode_cs_changeaddress(cs_changeaddress)
+                valid_addr = True
+            except Exception:
+                pass
+
+        if valid_addr:
+            self.cs_changeaddress_e.setStyleSheet(ColorScheme.GREEN.as_stylesheet(True))
+        else:
+            self.cs_changeaddress_e.setStyleSheet(ColorScheme.RED.as_stylesheet(True))
+
+    def on_cs_changeaddress_edit(self):
+        self.cs_changeaddress_e.setStyleSheet("")
+        cs_changeaddress = str(self.cs_changeaddress_e.text())
+
+        valid_addr = False
+        if cs_changeaddress != '':
+            try:
+                decode_cs_changeaddress(cs_changeaddress)
+                valid_addr = True
+            except Exception as e:
+                custom_message_box(icon=QMessageBox.Warning,
+                                   parent=None,
+                                   title=_('Error'),
+                                   text=_('Cannot set coldstaking changeaddress') + ' (1):\n' + repr(e))
+
+        if valid_addr:
+            self.config.set_key('cs_changeaddress', cs_changeaddress, True)

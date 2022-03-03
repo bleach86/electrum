@@ -59,7 +59,7 @@ from .util import (NotEnoughFunds, UserCancelled, profiler,
                    Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .bitcoin import COIN, TYPE_ADDRESS
-from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
+from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold, b58_address_to_hash160
 from .crypto import sha256d
 from . import keystore
 from .keystore import (load_keystore, Hardware_KeyStore, KeyStore, KeyStoreWithMPK,
@@ -82,6 +82,8 @@ from .logging import get_logger
 from .lnworker import LNWallet
 from .paymentrequest import PaymentRequest
 from .util import read_json_file, write_json_file, UserFacingException
+from . import segwit_addr
+from . import constants
 
 if TYPE_CHECKING:
     from .network import Network
@@ -1301,6 +1303,19 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             return addrs[0]
         return None
 
+    def set_change_pubkeys_if_coldstaking(self, change_addrs):
+        cs_changeaddress = self.config.get('cs_changeaddress', None)
+        if cs_changeaddress is None:
+            return None
+        stake_hash = decode_cs_changeaddress(cs_changeaddress)
+        change_pubkeys = {'stake_hash': stake_hash}
+        for addr in change_addrs:
+            addrtype, _ = b58_address_to_hash160(addr)
+            if addrtype != constants.net.ADDRTYPE_P2PKH:
+                raise ValueError(f'unknown address type for coldstaking change: {addrtype}')
+            change_pubkeys[addr] = bytes.fromhex(self.get_public_key(addr))
+        return change_pubkeys
+
     @check_returned_address_for_corruption
     def get_new_sweep_address_for_channel(self) -> str:
         # Recalc and get unused change addresses
@@ -1386,13 +1401,15 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 old_change_addrs = []
             # change address. if empty, coin_chooser will set it
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs)
+            change_pubkeys = self.set_change_pubkeys_if_coldstaking(change_addrs)
             tx = coin_chooser.make_tx(
                 coins=coins,
                 inputs=txi,
                 outputs=list(outputs) + txo,
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
-                dust_threshold=self.dust_threshold())
+                dust_threshold=self.dust_threshold(),
+                change_pubkeys=change_pubkeys)
         else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
@@ -1663,6 +1680,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             self.add_input_info(item)
         def fee_estimator(size):
             return self.config.estimate_fee_for_feerate(fee_per_kb=new_fee_rate*1000, size=size)
+
+        change_pubkeys = self.set_change_pubkeys_if_coldstaking(change_addrs)
         coin_chooser = coinchooser.get_coin_chooser(self.config)
         try:
             return coin_chooser.make_tx(
@@ -1671,7 +1690,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 outputs=fixed_outputs,
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
-                dust_threshold=self.dust_threshold())
+                dust_threshold=self.dust_threshold(),
+                change_pubkeys=change_pubkeys)
         except NotEnoughFunds as e:
             raise CannotBumpFee(e)
 
@@ -1955,11 +1975,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                     return True
         return False
 
-    def get_input_tx(self, tx_hash: str, *, ignore_network_issues=False) -> Optional[Transaction]:
+    def get_input_tx(self, tx_hash: str, *, ignore_network_issues=False, local_only_lookup=False) -> Optional[Transaction]:
         # First look up an input transaction in the wallet where it
         # will likely be.  If co-signing a transaction it may not have
         # all the input txs, in which case we ask the network.
         tx = self.db.get_transaction(tx_hash)
+        if not tx and local_only_lookup:
+            return None
         if not tx and self.network and self.network.has_internet_connection():
             try:
                 raw_tx = self.network.run_from_another_thread(
@@ -3417,3 +3439,17 @@ def update_password_for_directory(config: SimpleConfig, old_password, new_passwo
         return True
     check_password_for_directory(config, old_password, new_password)
     return True
+
+
+def decode_cs_changeaddress(address_str):
+    decoded_bech32 = segwit_addr.bech32_decode(address_str)
+    hrp = decoded_bech32.hrp
+    data_5bits = decoded_bech32.data
+    if decoded_bech32.encoding is None:
+        raise ValueError("Bad bech32 checksum")
+    if decoded_bech32.encoding != segwit_addr.Encoding.BECH32:
+        raise ValueError("Bad bech32 encoding: must be using vanilla BECH32")
+    if hrp != constants.net.STAKE_ONLY_PKADDR_HRP:
+        raise Exception('unexpected hrp: {}'.format(hrp))
+    data_8bits = segwit_addr.convertbits(data_5bits, 5, 8, False)
+    return bytes(data_8bits)

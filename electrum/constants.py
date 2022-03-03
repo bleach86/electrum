@@ -53,6 +53,8 @@ class AbstractNet:
     ADDRTYPE_P2PKH: int
     ADDRTYPE_P2SH: int
     SEGWIT_HRP: str
+    STAKE_ONLY_PKADDR_HRP: str
+    ADDRTYPE_P2PKH256: int
     BOLT11_HRP: str
     GENESIS: str
     BLOCK_HEIGHT_FIRST_LIGHTNING_CHANNELS: int = 0
@@ -76,6 +78,8 @@ class ParticlMainnet(AbstractNet):
     ADDRTYPE_P2PKH = 0x38
     ADDRTYPE_P2SH = 0x3c
     SEGWIT_HRP = "pw"
+    STAKE_ONLY_PKADDR_HRP = "pcs"
+    ADDRTYPE_P2PKH256 = 0x39
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000ee0784c195317ac95623e22fddb8c7b8825dc3998e0bb924d66866eccf4c"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
@@ -113,6 +117,8 @@ class ParticlTestnet(AbstractNet):
     ADDRTYPE_P2PKH = 0x76
     ADDRTYPE_P2SH = 0x7a
     SEGWIT_HRP = "tpw"
+    STAKE_ONLY_PKADDR_HRP = "tpcs"
+    ADDRTYPE_P2PKH256 = 0x77
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000594ada5310b367443ee0afd4fa3d0bbd5850ea4e33cdc7d6a904a7ec7c90"
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}
