@@ -1312,12 +1312,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         cs_spendaddresses = self.config.get('cs_spendaddresses', None)
         if cs_spendaddresses is not None:
             constant_cs_change_addrs = process_cs_spend_addrs(cs_spendaddresses)
-            new_change_addrs = []
-            for addr in change_addrs:
-                hash160 = ripemd(random.choice(constant_cs_change_addrs))
-                addr_p2pkh = hash160_to_p2pkh(hash160, net=constants.net)
-                new_change_addrs.append(addr_p2pkh)
-            change_addrs = new_change_addrs
+            if len(constant_cs_change_addrs) > 0:
+                new_change_addrs = []
+                for addr in change_addrs:
+                    hash160 = ripemd(random.choice(constant_cs_change_addrs))
+                    addr_p2pkh = hash160_to_p2pkh(hash160, net=constants.net)
+                    new_change_addrs.append(addr_p2pkh)
+                change_addrs = new_change_addrs
 
         stake_hash = decode_cs_changeaddress(cs_changeaddress)
         change_data = {'stake_hash': stake_hash}
@@ -3480,6 +3481,9 @@ def process_cs_spend_addrs(addresses_str):
     addresses = addresses_str.split('\n')
     pk_hashes = []
     for addr in addresses:
+        addr = addr.strip()
+        if addr == '':
+            continue
         addr_data = DecodeBase58Check(addr)
         if len(addr_data) != 33:
             raise ValueError('Invalid 256bit address length')
