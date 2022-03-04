@@ -1156,6 +1156,12 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         self.receive_address_e.setReadOnly(True)
         self.receive_address_e.textChanged.connect(self.update_receive_address_styling)
 
+        self.receive_address_256_e = ButtonsTextEdit()
+        self.receive_address_256_e.setFont(QFont(MONOSPACE_FONT))
+        self.receive_address_256_e.addCopyButton(self.app)
+        self.receive_address_256_e.setReadOnly(True)
+        self.receive_address_256_e.textChanged.connect(self.update_receive_address_256_styling)
+
         qr_show = lambda: self.show_qrcode(str(self.receive_address_e.text()), _('Receiving address'), parent=self)
         qr_icon = "qrcode_white.png" if ColorScheme.dark_scheme else "qrcode.png"
         self.receive_address_e.addButton(qr_icon, qr_show, _("Show as QR code"))
@@ -1167,6 +1173,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
 
         receive_tabs = QTabWidget()
         receive_tabs.addTab(self.receive_address_e, _('Address'))
+        receive_tabs.addTab(self.receive_address_256_e, _('Address 256bit'))
         receive_tabs.addTab(self.receive_payreq_e, _('Request'))
         receive_tabs.addTab(self.receive_qr, _('QR Code'))
         receive_tabs.setCurrentIndex(self.config.get('receive_tabs_index', 0))
@@ -1303,6 +1310,7 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
     def clear_receive_tab(self):
         self.receive_payreq_e.setText('')
         self.receive_address_e.setText('')
+        self.receive_address_256_e.setText('')
         self.receive_message_e.setText('')
         self.receive_amount_e.setAmount(None)
         self.expires_label.hide()
@@ -1349,6 +1357,16 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
         else:
             self.receive_address_e.setStyleSheet("")
             self.receive_address_e.setToolTip("")
+
+    def update_receive_address_256_styling(self):
+        addr = str(self.receive_address_e.text())
+        if is_address(addr) and self.wallet.is_used(addr):
+            self.receive_address_256_e.setStyleSheet(ColorScheme.RED.as_stylesheet(True))
+            self.receive_address_256_e.setToolTip(_("This address has already been used. "
+                                                "For better privacy, do not reuse it for new payments."))
+        else:
+            self.receive_address_256_e.setStyleSheet("")
+            self.receive_address_256_e.setToolTip("")
 
     def create_send_tab(self):
         # A 4-column grid layout.  All the stretch is in the last column.

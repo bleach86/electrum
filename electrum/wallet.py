@@ -59,7 +59,8 @@ from .util import (NotEnoughFunds, UserCancelled, profiler,
                    Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .bitcoin import COIN, TYPE_ADDRESS
-from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold, b58_address_to_hash160, DecodeBase58Check, hash160_to_p2pkh
+from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
+from .bitcoin import b58_address_to_hash160, DecodeBase58Check, hash160_to_p2pkh, EncodeBase58Check
 from .crypto import sha256d
 from . import keystore
 from .keystore import (load_keystore, Hardware_KeyStore, KeyStore, KeyStoreWithMPK,
@@ -2653,6 +2654,14 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             return None
         else:
             return allow_send, long_warning, short_warning
+
+    def get_addr256(self, addr):
+        try:
+            pk = self.get_public_key(addr)
+        except Exception as e:
+            return 'Unknown'
+        pk_hash = sha256(pk)
+        return EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + pk_hash)
 
 
 class Simple_Wallet(Abstract_Wallet):
