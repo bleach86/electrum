@@ -29,7 +29,7 @@ from typing import Optional, TYPE_CHECKING
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QComboBox,  QTabWidget,
                              QSpinBox,  QFileDialog, QCheckBox, QLabel,
-                             QVBoxLayout, QGridLayout, QLineEdit,
+                             QVBoxLayout, QGridLayout, QLineEdit, QPlainTextEdit,
                              QPushButton, QWidget, QHBoxLayout, QMessageBox)
 
 from electrum.i18n import _, languages
@@ -37,8 +37,7 @@ from electrum import util, coinchooser, paymentrequest
 from electrum.util import base_units_list
 from electrum.gui.qt.util import custom_message_box
 from electrum.gui import messages
-from electrum.wallet import decode_cs_changeaddress
-
+from electrum.wallet import decode_cs_changeaddress, process_cs_spend_addrs
 
 from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
                    CloseButton)
@@ -195,12 +194,24 @@ class SettingsDialog(WindowModalDialog):
 
         msg = _('Coldstaking changeaddress.') + '\n\n'\
               + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
-        cs_changeaddress_label = HelpLabel(_('Coldstaking change address') + ':', msg)
+        cs_changeaddress_label = HelpLabel(_('Coldstaking Change Address') + ':', msg)
         cs_changeaddress = self.config.get('cs_changeaddress','')
         self.cs_changeaddress_e = QLineEdit(cs_changeaddress)
         self.set_cs_changeaddress_color()
         self.cs_changeaddress_e.editingFinished.connect(self.on_cs_changeaddress_edit)
         cs_widgets.append((cs_changeaddress_label, self.cs_changeaddress_e))
+
+        msg = _('Coldstaking spend addresses.') + '\n\n'\
+              + 'Change will only be sent to an address from the list if any are set.\n'\
+              + 'Listed addresses must be spendable by the wallet.\n'\
+              + 'Add one per line. Address will be selected randomly when creating transactions.\n'\
+              + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
+        cs_spendaddresses_label = HelpLabel(_('Coldstaking Spend Addresses') + ':', msg)
+        cs_spendaddresses = self.config.get('cs_spendaddresses','')
+        self.cs_spendaddresses = QPlainTextEdit(cs_spendaddresses)
+        self.on_cs_spendaddresses_edit()  # Set colour
+        self.cs_spendaddresses.textChanged.connect(self.on_cs_spendaddresses_edit)
+        cs_widgets.append((cs_spendaddresses_label, self.cs_spendaddresses))
 
         msat_cb = QCheckBox(_("Show amounts with msat precision"))
         msat_cb.setChecked(bool(self.config.get('amt_precision_post_satoshi', False)))
@@ -595,3 +606,20 @@ class SettingsDialog(WindowModalDialog):
 
         if valid_addr:
             self.config.set_key('cs_changeaddress', cs_changeaddress, True)
+
+    def on_cs_spendaddresses_edit(self):
+        new_text = self.cs_spendaddresses.toPlainText()
+        valid_data = True
+        try:
+            if new_text != '':
+                process_cs_spend_addrs(new_text)
+                self.cs_spendaddresses.setStyleSheet(ColorScheme.GREEN.as_stylesheet(True))
+        except Exception as e:
+            valid_data = False
+            self.cs_spendaddresses.setStyleSheet(ColorScheme.RED.as_stylesheet(True))
+            #custom_message_box(icon=QMessageBox.Warning,
+            #                   parent=None,
+            #                   title=_('Error'),
+            #                   text=_('Cannot set coldstaking spend addresses') + ' (1):\n' + repr(e))
+        if valid_data:
+            self.config.set_key('cs_spendaddresses', new_text, True)

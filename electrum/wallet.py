@@ -50,7 +50,7 @@ from aiorpcx import TaskGroup, timeout_after, TaskTimeout, ignore_after
 
 from .i18n import _
 from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_path_to_list_of_uint32
-from .crypto import sha256
+from .crypto import sha256, ripemd
 from . import util
 from .util import (NotEnoughFunds, UserCancelled, profiler,
                    format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates,
@@ -59,7 +59,7 @@ from .util import (NotEnoughFunds, UserCancelled, profiler,
                    Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .bitcoin import COIN, TYPE_ADDRESS
-from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold, b58_address_to_hash160
+from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold, b58_address_to_hash160, DecodeBase58Check, hash160_to_p2pkh
 from .crypto import sha256d
 from . import keystore
 from .keystore import (load_keystore, Hardware_KeyStore, KeyStore, KeyStoreWithMPK,
@@ -1303,18 +1303,30 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             return addrs[0]
         return None
 
-    def set_change_pubkeys_if_coldstaking(self, change_addrs):
+    def set_change_data_if_coldstaking(self, change_addrs):
         cs_changeaddress = self.config.get('cs_changeaddress', None)
         if cs_changeaddress is None:
-            return None
+            return change_addrs, None
+
+        cs_spendaddresses = self.config.get('cs_spendaddresses', None)
+        if cs_spendaddresses is not None:
+            constant_cs_change_addrs = process_cs_spend_addrs(cs_spendaddresses)
+            new_change_addrs = []
+            for addr in change_addrs:
+                hash160 = ripemd(random.choice(constant_cs_change_addrs))
+                addr_p2pkh = hash160_to_p2pkh(hash160, net=constants.net)
+                new_change_addrs.append(addr_p2pkh)
+            change_addrs = new_change_addrs
+
         stake_hash = decode_cs_changeaddress(cs_changeaddress)
-        change_pubkeys = {'stake_hash': stake_hash}
+        change_data = {'stake_hash': stake_hash}
         for addr in change_addrs:
             addrtype, _ = b58_address_to_hash160(addr)
             if addrtype != constants.net.ADDRTYPE_P2PKH:
                 raise ValueError(f'unknown address type for coldstaking change: {addrtype}')
-            change_pubkeys[addr] = bytes.fromhex(self.get_public_key(addr))
-        return change_pubkeys
+            change_data[addr] = bytes.fromhex(self.get_public_key(addr))
+
+        return change_addrs, change_data
 
     @check_returned_address_for_corruption
     def get_new_sweep_address_for_channel(self) -> str:
@@ -1401,7 +1413,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 old_change_addrs = []
             # change address. if empty, coin_chooser will set it
             change_addrs = self.get_change_addresses_for_new_transaction(change_addr or old_change_addrs)
-            change_pubkeys = self.set_change_pubkeys_if_coldstaking(change_addrs)
+            change_addrs, change_data = self.set_change_data_if_coldstaking(change_addrs)
             tx = coin_chooser.make_tx(
                 coins=coins,
                 inputs=txi,
@@ -1409,7 +1421,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
                 dust_threshold=self.dust_threshold(),
-                change_pubkeys=change_pubkeys)
+                change_data=change_data)
         else:
             # "spend max" branch
             # note: This *will* spend inputs with negative effective value (if there are any).
@@ -1681,7 +1693,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         def fee_estimator(size):
             return self.config.estimate_fee_for_feerate(fee_per_kb=new_fee_rate*1000, size=size)
 
-        change_pubkeys = self.set_change_pubkeys_if_coldstaking(change_addrs)
+        change_addrs, change_data = self.set_change_data_if_coldstaking(change_addrs)
         coin_chooser = coinchooser.get_coin_chooser(self.config)
         try:
             return coin_chooser.make_tx(
@@ -1691,7 +1703,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 change_addrs=change_addrs,
                 fee_estimator_vb=fee_estimator,
                 dust_threshold=self.dust_threshold(),
-                change_pubkeys=change_pubkeys)
+                change_data=change_data)
         except NotEnoughFunds as e:
             raise CannotBumpFee(e)
 
@@ -3453,3 +3465,16 @@ def decode_cs_changeaddress(address_str):
         raise Exception('unexpected hrp: {}'.format(hrp))
     data_8bits = segwit_addr.convertbits(data_5bits, 5, 8, False)
     return bytes(data_8bits)
+
+
+def process_cs_spend_addrs(addresses_str):
+    addresses = addresses_str.split('\n')
+    pk_hashes = []
+    for addr in addresses:
+        addr_data = DecodeBase58Check(addr)
+        if len(addr_data) != 33:
+            raise ValueError('Invalid 256bit address length')
+        if addr_data[0] != constants.net.ADDRTYPE_P2PKH256:
+            raise ValueError('Invalid 256bit address type')
+        pk_hashes.append(addr_data[1:])
+    return pk_hashes
