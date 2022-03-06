@@ -192,10 +192,14 @@ class SettingsDialog(WindowModalDialog):
         self.alias_e.editingFinished.connect(self.on_alias_edit)
         oa_widgets.append((alias_label, self.alias_e))
 
+
+        cs_wallet_label = QLabel(_('Wallet') + ':')
+        cs_wallet_value = QLabel(self.window.wallet.basename())
+        cs_widgets.append((cs_wallet_label, cs_wallet_value))
         msg = _('Coldstaking changeaddress.') + '\n\n'\
               + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
         cs_changeaddress_label = HelpLabel(_('Coldstaking Change Address') + ':', msg)
-        cs_changeaddress = self.config.get('cs_changeaddress','')
+        cs_changeaddress = self.window.wallet.db.get('cs_changeaddress','')
         self.cs_changeaddress_e = QLineEdit(cs_changeaddress)
         self.set_cs_changeaddress_color()
         self.cs_changeaddress_e.editingFinished.connect(self.on_cs_changeaddress_edit)
@@ -207,7 +211,7 @@ class SettingsDialog(WindowModalDialog):
               + 'Add one per line. Address will be selected randomly when creating transactions.\n'\
               + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
         cs_spendaddresses_label = HelpLabel(_('Coldstaking Spend Addresses') + ':', msg)
-        cs_spendaddresses = self.config.get('cs_spendaddresses','')
+        cs_spendaddresses = self.window.wallet.db.get('cs_spendaddresses', '')
         self.cs_spendaddresses = QPlainTextEdit(cs_spendaddresses)
         self.on_cs_spendaddresses_edit()  # Set colour
         self.cs_spendaddresses.textChanged.connect(self.on_cs_spendaddresses_edit)
@@ -571,7 +575,7 @@ class SettingsDialog(WindowModalDialog):
             self.window.fetch_alias()
 
     def set_cs_changeaddress_color(self):
-        if not self.config.get('cs_changeaddress'):
+        if not self.window.wallet.db.get('cs_changeaddress'):
             self.alias_e.setStyleSheet("")
             return
         cs_changeaddress = str(self.cs_changeaddress_e.text())
@@ -593,19 +597,13 @@ class SettingsDialog(WindowModalDialog):
         self.cs_changeaddress_e.setStyleSheet("")
         cs_changeaddress = str(self.cs_changeaddress_e.text())
 
-        valid_addr = False
-        if cs_changeaddress != '':
-            try:
-                decode_cs_changeaddress(cs_changeaddress)
-                valid_addr = True
-            except Exception as e:
-                custom_message_box(icon=QMessageBox.Warning,
-                                   parent=None,
-                                   title=_('Error'),
-                                   text=_('Cannot set coldstaking changeaddress') + ' (1):\n' + repr(e))
-
-        if valid_addr:
-            self.config.set_key('cs_changeaddress', cs_changeaddress, True)
+        try:
+            self.window.wallet.set_cs_changeaddress(cs_changeaddress)
+        except Exception as e:
+            custom_message_box(icon=QMessageBox.Warning,
+                               parent=None,
+                               title=_('Error'),
+                               text=_('Cannot set coldstaking changeaddress') + ' (1):\n' + repr(e))
 
     def on_cs_spendaddresses_edit(self):
         new_text = self.cs_spendaddresses.toPlainText()
@@ -622,4 +620,4 @@ class SettingsDialog(WindowModalDialog):
             #                   title=_('Error'),
             #                   text=_('Cannot set coldstaking spend addresses') + ' (1):\n' + repr(e))
         if valid_data:
-            self.config.set_key('cs_spendaddresses', new_text, True)
+            self.window.wallet.db.put('cs_spendaddresses', new_text)

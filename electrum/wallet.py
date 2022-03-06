@@ -1305,11 +1305,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         return None
 
     def set_change_data_if_coldstaking(self, change_addrs):
-        cs_changeaddress = self.config.get('cs_changeaddress', None)
+        cs_changeaddress = self.db.get('cs_changeaddress', None)
         if cs_changeaddress is None:
             return change_addrs, None
 
-        cs_spendaddresses = self.config.get('cs_spendaddresses', None)
+        cs_spendaddresses = self.db.get('cs_spendaddresses', None)
         if cs_spendaddresses is not None:
             constant_cs_change_addrs = process_cs_spend_addrs(cs_spendaddresses)
             if len(constant_cs_change_addrs) > 0:
@@ -2663,6 +2663,46 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             return 'Unknown'
         pk_hash = sha256(pk)
         return EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + pk_hash)
+
+    def set_cs_changeaddress(self, address_str_in):
+        address_str = address_str_in.strip()
+        if address_str != '':
+            decode_cs_changeaddress(address_str)
+        self.window.wallet.db.put('cs_changeaddress', address_str)
+        return True
+
+    def add_cs_spendchangeaddress(self, address_str):
+        address_str = address_str.strip()
+        addr_data = DecodeBase58Check(address_str)
+        if len(addr_data) != 33:
+            raise ValueError('Invalid 256bit address length')
+        if addr_data[0] != constants.net.ADDRTYPE_P2PKH256:
+            raise ValueError('Invalid 256bit address type')
+
+        addrs_str = self.db.get('cs_spendaddresses', '')
+        addrs = process_cs_spend_addrs(addrs_str)
+        if addr_data[1:] in addrs:
+            raise ValueError('Address exists')
+
+        if addrs_str != '':
+            addrs_str += '\n'
+        addrs_str += address_str
+        self.db.put('cs_spendaddresses', addrs_str)
+        return True
+
+    def remove_cs_spendchangeaddress(self, address_str):
+        address_str = address_str.strip()
+        addrs_str = self.db.get('cs_spendaddresses', '')
+        addrs = addrs_str.split('\n')
+        has_changed = False
+        addrs_out = []
+        for addr in addrs:
+            if addr == address_str:
+                has_changed = True
+            else:
+                addrs_out.append(addr)
+        self.db.put('cs_spendaddresses', '\n'.join(addrs_out))
+        return has_changed
 
 
 class Simple_Wallet(Abstract_Wallet):

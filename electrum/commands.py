@@ -50,7 +50,7 @@ from .transaction import (Transaction, multisig_script, TxOutput, PartialTransac
                           tx_from_any, PartialTxInput, TxOutpoint)
 from .invoices import PR_PAID, PR_UNPAID, PR_UNKNOWN, PR_EXPIRED
 from .synchronizer import Notifier
-from .wallet import Abstract_Wallet, create_new_wallet, restore_wallet_from_text, Deterministic_Wallet, BumpFeeStrategy
+from .wallet import Abstract_Wallet, create_new_wallet, restore_wallet_from_text, Deterministic_Wallet, BumpFeeStrategy, process_cs_spend_addrs
 from .address_synchronizer import TX_HEIGHT_LOCAL
 from .mnemonic import Mnemonic
 from .lnutil import SENT, RECEIVED
@@ -1260,6 +1260,33 @@ class Commands:
             'lightning_amount': format_satoshis(lightning_amount_sat),
             'onchain_amount': format_satoshis(onchain_amount_sat),
         }
+
+    @command('w')
+    async def cs_view_stakechangeaddress(self, wallet: Abstract_Wallet = None):
+        """View coldstakingchangeaddress."""
+        return wallet.db.get('cs_changeaddress', '')
+
+    @command('w')
+    async def cs_set_stakechangeaddress(self, new_addr: str, wallet: Abstract_Wallet = None):
+        """Set coldstakingchangeaddress."""
+        wallet.set_cs_changeaddress(new_addr)
+        return True
+
+    @command('w')
+    async def cs_list_spendchangeaddresses(self, wallet: Abstract_Wallet = None):
+        """List coldstakingspendchangeaddresses."""
+        cs_spendaddresses = wallet.db.get('cs_spendaddresses', '')
+        return process_cs_spend_addrs(cs_spendaddresses)
+
+    @command('w')
+    async def cs_add_spendchangeaddress(self, addr: str, wallet: Abstract_Wallet = None):
+        """Add coldstakingspendchangeaddresses."""
+        return wallet.add_cs_spendchangeaddress(addr)
+
+    @command('w')
+    async def cs_remove_spendchangeaddress(self, addr: str, wallet: Abstract_Wallet = None):
+        """Remove coldstakingspendchangeaddress."""
+        return wallet.remove_coldstakingspendchangeaddress(addr)
 
 
 def eval_bool(x: str) -> bool:
