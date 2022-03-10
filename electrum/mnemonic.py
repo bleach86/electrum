@@ -238,6 +238,7 @@ def is_old_seed(seed: str) -> bool:
         uses_electrum_words = True
     except Exception:
         uses_electrum_words = False
+
     try:
         seed = bfh(seed)
         is_hex = (len(seed) == 16 or len(seed) == 32)
@@ -261,6 +262,10 @@ def seed_type(x: str) -> str:
         return '2fa'
     elif is_new_seed(x, version.SEED_PREFIX_2FA_SW):
         return '2fa_segwit'
+    else:
+        from electrum.keystore import bip39_is_checksum_valid
+        if bip39_is_checksum_valid(x) == (True, True):
+            return 'bip39'
     return ''
 
 

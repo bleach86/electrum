@@ -1055,12 +1055,23 @@ def from_seed(seed, passphrase, is_p2sh=False):
     if t == 'old':
         keystore = Old_KeyStore({})
         keystore.add_seed(seed)
+    if t == 'bip39':
+        keystore = BIP32_KeyStore({})
+        keystore.add_seed(seed)
+        keystore.passphrase = passphrase
+        bip32_seed = bip39_to_seed(seed, passphrase)
+        der = bip44_derivation(0)
+        xtype = 'standard'
+        keystore.add_xprv_from_seed(bip32_seed, xtype, der)
     elif t in ['standard', 'segwit']:
         keystore = BIP32_KeyStore({})
         keystore.add_seed(seed)
         keystore.passphrase = passphrase
         bip32_seed = Mnemonic.mnemonic_to_seed(seed, passphrase)
         if t == 'standard':
+            der = "m/"
+            xtype = 'standard'
+        elif t == 'bip39':
             der = "m/"
             xtype = 'standard'
         else:
