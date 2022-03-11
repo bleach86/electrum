@@ -1330,6 +1330,15 @@ class PartialTxInput(TxInput, PSBTSection):
                             for pubkey, (xfp, path) in self.bip32_paths.items()},
             'unknown_psbt_fields': {key.hex(): val.hex() for key, val in self._unknown.items()},
         })
+
+        try:
+            d['stake_address'] = self.stakeaddress
+        except Exception:
+            pass
+        try:
+            d['spend_address'] = self.spendaddress
+        except Exception:
+            pass
         return d
 
     @classmethod

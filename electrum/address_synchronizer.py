@@ -39,6 +39,8 @@ from .verifier import SPV
 from .blockchain import hash_header, Blockchain
 from .i18n import _
 from .logging import Logger
+from .bitcoin import opcodes, EncodeBase58Check
+from . import constants, segwit_addr
 
 if TYPE_CHECKING:
     from .network import Network
@@ -843,6 +845,7 @@ class AddressSynchronizer(Logger):
             confirmed_spending_only: bool = False,
             nonlocal_only: bool = False,
             block_height: int = None,
+            inspect_scripts: bool = False,
     ) -> Sequence[PartialTxInput]:
         if block_height is not None:
             # caller wants the UTXOs we had at a given height; check other parameters
@@ -873,6 +876,16 @@ class AddressSynchronizer(Logger):
                 if (mature_only and txo.is_coinbase_output()
                         and txo.block_height + COINBASE_MATURITY > mempool_height):
                     continue
+
+                if inspect_scripts:
+                    full_tx = self.get_input_tx(txo.prevout.txid.hex(), local_only_lookup=True)
+                    scriptpubkey = full_tx.outputs()[txo.prevout.out_idx].scriptpubkey
+                    if len(scriptpubkey) == 66 and scriptpubkey[0] == opcodes.OP_ISCOINSTAKE:
+                        stake_hash = scriptpubkey[5: 5 + 20]
+                        txo.stakeaddress = segwit_addr.bech32_encode(segwit_addr.Encoding.BECH32, constants.net.STAKE_ONLY_PKADDR_HRP, segwit_addr.convertbits(stake_hash, 8, 5))
+                        spend_hash = scriptpubkey[31:31 + 32]
+                        txo.spendaddress = EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + spend_hash)
+
                 coins.append(txo)
                 continue
         return coins

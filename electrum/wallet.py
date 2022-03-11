@@ -1306,7 +1306,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def set_change_data_if_coldstaking(self, change_addrs):
         cs_changeaddress = self.db.get('cs_changeaddress', None)
-        if cs_changeaddress is None:
+        if cs_changeaddress is None or cs_changeaddress.strip() == '':
             return change_addrs, None
 
         cs_spendaddresses = self.db.get('cs_spendaddresses', None)
@@ -2661,14 +2661,14 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             pk = self.get_public_key(addr)
         except Exception as e:
             return 'Unknown'
-        pk_hash = sha256(pk)
+        pk_hash = sha256(bytes.fromhex(pk))
         return EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + pk_hash)
 
     def set_cs_changeaddress(self, address_str_in):
         address_str = address_str_in.strip()
         if address_str != '':
             decode_cs_changeaddress(address_str)
-        self.window.wallet.db.put('cs_changeaddress', address_str)
+        self.db.put('cs_changeaddress', address_str)
         return True
 
     def add_cs_spendchangeaddress(self, address_str):
@@ -2703,6 +2703,14 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 addrs_out.append(addr)
         self.db.put('cs_spendaddresses', '\n'.join(addrs_out))
         return has_changed
+
+    def list_cs_spendchangeaddresses(self):
+        cs_spendaddresses = self.db.get('cs_spendaddresses', '')
+        pk_hashes = process_cs_spend_addrs(cs_spendaddresses)
+        rv = []
+        for ph_hash in pk_hashes:
+            rv.append(EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + ph_hash))
+        return rv
 
 
 class Simple_Wallet(Abstract_Wallet):

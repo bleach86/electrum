@@ -345,7 +345,7 @@ class Commands:
         """List unspent outputs. Returns the list of unspent transaction
         outputs in your wallet."""
         coins = []
-        for txin in wallet.get_utxos():
+        for txin in wallet.get_utxos(inspect_scripts=True):
             d = txin.to_json()
             v = d.pop("value_sats")
             d["value"] = str(Decimal(v)/COIN) if v is not None else None
@@ -1275,8 +1275,7 @@ class Commands:
     @command('w')
     async def cs_list_spendchangeaddresses(self, wallet: Abstract_Wallet = None):
         """List coldstakingspendchangeaddresses."""
-        cs_spendaddresses = wallet.db.get('cs_spendaddresses', '')
-        return process_cs_spend_addrs(cs_spendaddresses)
+        return wallet.list_cs_spendchangeaddresses()
 
     @command('w')
     async def cs_add_spendchangeaddress(self, addr: str, wallet: Abstract_Wallet = None):
@@ -1286,7 +1285,12 @@ class Commands:
     @command('w')
     async def cs_remove_spendchangeaddress(self, addr: str, wallet: Abstract_Wallet = None):
         """Remove coldstakingspendchangeaddress."""
-        return wallet.remove_coldstakingspendchangeaddress(addr)
+        return wallet.remove_cs_spendchangeaddress(addr)
+
+    @command('w')
+    async def cs_show_256bit_address(self, address, wallet: Abstract_Wallet = None):
+        """Return the 256bit address of the public key for the provided wallet address. """
+        return wallet.get_addr256(address)
 
 
 def eval_bool(x: str) -> bool:
