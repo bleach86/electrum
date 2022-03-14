@@ -5,12 +5,12 @@ Electrum Particl - Lightweight Particl client
 
   Licence: MIT Licence
   Author: Thomas Voegtlin
-  Language: Python (>= 3.6)
+  Language: Python (>= 3.8)
   Homepage: https://electrum.org/
 
 
-.. image:: https://travis-ci.org/spesmilo/electrum.svg?branch=master
-    :target: https://travis-ci.org/spesmilo/electrum
+.. image:: https://api.cirrus-ci.com/github/spesmilo/electrum.svg?branch=master
+    :target: https://cirrus-ci.com/github/spesmilo/electrum
     :alt: Build Status
 .. image:: https://coveralls.io/repos/github/spesmilo/electrum/badge.svg?branch=master
     :target: https://coveralls.io/github/spesmilo/electrum?branch=master
@@ -112,7 +112,13 @@ Finally, to start Electrum::
 
     ./run_electrum
 
+Run unit tests with `pytest`:
 
+    pytest electrum/tests -v
+
+To run a single file, specify it directly like this:
+
+    pytest electrum/tests/test_bitcoin.py -v
 
 Creating Binaries
 =================

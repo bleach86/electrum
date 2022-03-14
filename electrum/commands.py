@@ -41,7 +41,7 @@ from typing import Optional, TYPE_CHECKING, Dict, List
 
 from .import util, ecc
 from .util import (bfh, bh2u, format_satoshis, json_decode, json_normalize,
-                   is_hash256_str, is_hex_str, to_bytes)
+                   is_hash256_str, is_hex_str, to_bytes, parse_max_spend)
 from . import bitcoin
 from .bitcoin import is_address,  hash_160, COIN
 from .bip32 import BIP32Node
@@ -77,7 +77,7 @@ class NotSynchronizedException(Exception):
 
 
 def satoshis_or_max(amount):
-    return satoshis(amount) if amount != '!' else '!'
+    return satoshis(amount) if not parse_max_spend(amount) else amount
 
 def satoshis(amount):
     # satoshi conversion must not be performed by the parser
@@ -217,7 +217,6 @@ class Commands:
     @command('n')
     async def stop(self):
         """Stop daemon"""
-        # TODO it would be nice if this could stop the GUI too
         await self.daemon.stop()
         return "Daemon stopped"
 
@@ -1391,7 +1390,7 @@ arg_types = {
     'inputs': json_loads,
     'outputs': json_loads,
     'fee': lambda x: str(Decimal(x)) if x is not None else None,
-    'amount': lambda x: str(Decimal(x)) if x != '!' else '!',
+    'amount': lambda x: str(Decimal(x)) if not parse_max_spend(x) else x,
     'locktime': int,
     'addtransaction': eval_bool,
     'fee_method': str,
@@ -1418,7 +1417,7 @@ def set_default_subparser(self, name, args=None):
     """see http://stackoverflow.com/questions/5176691/argparse-how-to-specify-a-default-subcommand"""
     subparser_found = False
     for arg in sys.argv[1:]:
-        if arg in ['-h', '--help']:  # global help if no subparser
+        if arg in ['-h', '--help', '--version']:  # global help/version if no subparser
             break
     else:
         for x in self._subparsers._actions:
@@ -1495,6 +1494,7 @@ def get_parser():
     # create main parser
     parser = argparse.ArgumentParser(
         epilog="Run 'electrum help <command>' to see the help for a command")
+    parser.add_argument("--version", dest="cmd", action='store_const', const='version', help="Return the version of Electrum.")
     add_global_options(parser)
     add_wallet_option(parser)
     subparsers = parser.add_subparsers(dest='cmd', metavar='<command>')
@@ -1512,6 +1512,8 @@ def get_parser():
     # daemon
     parser_daemon = subparsers.add_parser('daemon', help="Run Daemon")
     parser_daemon.add_argument("-d", "--detached", action="store_true", dest="detach", default=False, help="run daemon in detached mode")
+    parser_daemon.add_argument("--rpcsock", dest="rpcsock", default=None, help="what socket type to which to bind RPC daemon", choices=['unix', 'tcp', 'auto'])
+    parser_daemon.add_argument("--rpcsockpath", dest="rpcsockpath", help="where to place RPC file socket")
     add_network_options(parser_daemon)
     add_global_options(parser_daemon)
     # commands

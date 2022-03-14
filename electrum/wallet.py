@@ -46,17 +46,17 @@ import itertools
 import threading
 import enum
 
-from aiorpcx import TaskGroup, timeout_after, TaskTimeout, ignore_after
+from aiorpcx import timeout_after, TaskTimeout, ignore_after
 
 from .i18n import _
 from .bip32 import BIP32Node, convert_bip32_intpath_to_strpath, convert_bip32_path_to_list_of_uint32
 from .crypto import sha256, ripemd
 from . import util
-from .util import (NotEnoughFunds, UserCancelled, profiler,
+from .util import (NotEnoughFunds, UserCancelled, profiler, OldTaskGroup,
                    format_satoshis, format_fee_satoshis, NoDynamicFeeEstimates,
-                   WalletFileException, BitcoinException, MultipleSpendMaxTxOutputs,
+                   WalletFileException, BitcoinException,
                    InvalidPassword, format_time, timestamp_to_datetime, Satoshis,
-                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex)
+                   Fiat, bfh, bh2u, TxMinedInfo, quantize_feerate, create_bip21_uri, OrderedDictWithIndex, parse_max_spend)
 from .simple_config import SimpleConfig, FEE_RATIO_HIGH_WARNING, FEERATE_WARNING_HIGH_FEE
 from .bitcoin import COIN, TYPE_ADDRESS
 from .bitcoin import is_address, address_to_script, is_minikey, relayfee, dust_threshold
@@ -137,7 +137,7 @@ async def _append_utxos_to_inputs(*, inputs: List[PartialTxInput], network: 'Net
         inputs.append(txin)
 
     u = await network.listunspent_for_scripthash(scripthash)
-    async with TaskGroup() as group:
+    async with OldTaskGroup() as group:
         for item in u:
             if len(inputs) >= imax:
                 break
@@ -158,7 +158,7 @@ async def sweep_preparations(privkeys, network: 'Network', imax=100):
 
     inputs = []  # type: List[PartialTxInput]
     keypairs = {}
-    async with TaskGroup() as group:
+    async with OldTaskGroup() as group:
         for sec in privkeys:
             txin_type, privkey, compressed = bitcoin.deserialize_privkey(sec)
             await group.spawn(find_utxos_for_privkey(txin_type, privkey, compressed))
@@ -325,7 +325,6 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             for chan_id, chan in self.lnworker.channels.items():
                 channel_backups[chan_id.hex()] = self.lnworker.create_channel_backup(chan_id)
             new_db.put('channels', None)
-            new_db.put('lightning_xprv', None)
             new_db.put('lightning_privkey2', None)
 
         new_path = os.path.join(backup_dir, self.basename() + '.backup')
@@ -759,10 +758,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         height=self.get_local_height()
         if pr:
             return OnchainInvoice.from_bip70_payreq(pr, height)
-        if '!' in (x.value for x in outputs):
-            amount = '!'
-        else:
-            amount = sum(x.value for x in outputs)
+        amount = 0
+        for x in outputs:
+            if parse_max_spend(x.value):
+                amount = '!'
+                break
+            else:
+                amount += x.value
         timestamp = None
         exp = None
         if URI:
@@ -868,7 +870,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         assert isinstance(invoice, OnchainInvoice)
         invoice_amounts = defaultdict(int)  # type: Dict[bytes, int]  # scriptpubkey -> value_sats
         for txo in invoice.outputs:  # type: PartialTxOutput
-            invoice_amounts[txo.scriptpubkey] += 1 if txo.value == '!' else txo.value
+            invoice_amounts[txo.scriptpubkey] += 1 if parse_max_spend(txo.value) else txo.value
         relevant_txs = []
         with self.transaction_lock:
             for invoice_scriptpubkey, invoice_amt in invoice_amounts.items():
@@ -1367,12 +1369,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         outputs = copy.deepcopy(outputs)
 
         # check outputs
-        i_max = None
+        i_max = []
+        i_max_sum = 0
         for i, o in enumerate(outputs):
-            if o.value == '!':
-                if i_max is not None:
-                    raise MultipleSpendMaxTxOutputs()
-                i_max = i
+            weight = parse_max_spend(o.value)
+            if weight:
+                i_max_sum += weight
+                i_max.append((weight, i))
 
         if fee is None and self.config.fee_per_kb() is None:
             raise NoDynamicFeeEstimates()
@@ -1390,7 +1393,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         else:
             raise Exception(f'Invalid argument fee: {fee}')
 
-        if i_max is None:
+        if len(i_max) == 0:
             # Let the coin chooser select the coins to spend
             coin_chooser = coinchooser.get_coin_chooser(self.config)
             # If there is an unconfirmed RBF tx, merge with it
@@ -1433,16 +1436,24 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             #       Given as the user is spending "max", and so might be abandoning the wallet,
             #       try to include all UTXOs, otherwise leftover might remain in the UTXO set
             #       forever. see #5433
-            # note: Actually it might be the case that not all UTXOs from the wallet are
+            # note: Actually, it might be the case that not all UTXOs from the wallet are
             #       being spent if the user manually selected UTXOs.
             sendable = sum(map(lambda c: c.value_sats(), coins))
-            outputs[i_max].value = 0
+            for (_,i) in i_max:
+                outputs[i].value = 0
             tx = PartialTransaction.from_io(list(coins), list(outputs))
             fee = fee_estimator(tx.estimated_size())
             amount = sendable - tx.output_value() - fee
             if amount < 0:
                 raise NotEnoughFunds()
-            outputs[i_max].value = amount
+            distr_amount = 0
+            for (weight, i) in i_max:
+                val = int((amount/i_max_sum) * weight)
+                outputs[i].value = val
+                distr_amount += val
+
+            (x,i) = i_max[-1]
+            outputs[i].value += (amount - distr_amount)
             tx = PartialTransaction.from_io(list(coins), list(outputs))
 
         # Timelock tx to current height.
@@ -1489,7 +1500,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         The idea here is that an attacker might send us a UTXO in a
         large low-fee unconfirmed tx that will ~never confirm. If we
         spend it as part of a tx ourselves, that too will not confirm
-        (unless we use a high fee but that might not be worth it for
+        (unless we use a high fee, but that might not be worth it for
         a small value UTXO).
         In particular, this test triggers for large "dusting transactions"
         that are used for advertising purposes by some entities.
@@ -2306,7 +2317,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         expiration = expiration or 0
         return OnchainInvoice(
             type=PR_TYPE_ONCHAIN,
-            outputs=[(TYPE_ADDRESS, address, amount_sat)],
+            outputs=[PartialTxOutput.from_address_and_value(address, amount_sat)],
             message=message,
             time=timestamp,
             amount_sat=amount_sat,
@@ -2483,9 +2494,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
     def _update_password_for_keystore(self, old_pw: Optional[str], new_pw: Optional[str]) -> None:
         pass
 
-    def sign_message(self, address, message, password):
+    def sign_message(self, address: str, message: str, password) -> bytes:
         index = self.get_address_index(address)
-        return self.keystore.sign_message(index, message, password)
+        script_type = self.get_txin_type(address)
+        assert script_type != "address"
+        return self.keystore.sign_message(index, message, password, script_type=script_type)
 
     def decrypt_message(self, pubkey: str, message, password) -> bytes:
         addr = self.pubkeys_to_address([pubkey])
