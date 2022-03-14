@@ -1304,8 +1304,11 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             return addrs[0]
         return None
 
+    def get_cs_changeaddress(self, default=None):
+        return self.db.get('cs_changeaddress', default)
+
     def set_change_data_if_coldstaking(self, change_addrs):
-        cs_changeaddress = self.db.get('cs_changeaddress', None)
+        cs_changeaddress = self.get_cs_changeaddress()
         if cs_changeaddress is None or cs_changeaddress.strip() == '':
             return change_addrs, None
 
@@ -2692,6 +2695,13 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
 
     def remove_cs_spendchangeaddress(self, address_str):
         address_str = address_str.strip()
+        # Decode address to test validity
+        addr_data = DecodeBase58Check(address_str)
+        if len(addr_data) != 33:
+            raise ValueError('Invalid 256bit address length')
+        if addr_data[0] != constants.net.ADDRTYPE_P2PKH256:
+            raise ValueError('Invalid 256bit address type')
+
         addrs_str = self.db.get('cs_spendaddresses', '')
         addrs = addrs_str.split('\n')
         has_changed = False
