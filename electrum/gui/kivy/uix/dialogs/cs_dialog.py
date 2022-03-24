@@ -110,7 +110,8 @@ class CSDialog(Factory.Popup):
 
     def set_data(self):
         ti_stake = self.ids.textinput_coldstaking_changeaddress
-        ti_stake.text = self.app.wallet.get_cs_changeaddress()
+        cs_changeaddress = self.app.wallet.get_cs_changeaddress()
+        ti_stake.text = '' if not cs_changeaddress else cs_changeaddress
 
         ti_spend = self.ids.textinput_coldstaking_spend_changeaddresses
         ti_spend.text = '\n'.join(self.app.wallet.list_cs_spendchangeaddresses())

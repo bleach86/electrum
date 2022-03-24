@@ -69,7 +69,7 @@
             size_hint_x: None
             size: root.icon_size, root.icon_size
 
-            
+
 <BackgroundColor@Widget>
     background_color: 0, 0, 0, 1
     canvas.before:
@@ -129,7 +129,7 @@
         id: lbl1
         text: '[ref=%s]%s[/ref]'%(root.address, root.address)
         color: root.color
-        background_color: root.background_color 
+        background_color: root.background_color
         font_size: '6pt'
         shorten: True
         size_hint_x: 0.65
@@ -534,9 +534,9 @@ BoxLayout:
                 ActionOvrButton:
                     name: 'addresses_dialog'
                     text: _('Addresses')
-                ActionOvrButton:
-                    name: 'lightning_channels_dialog'
-                    text: _('Channels')
+#                ActionOvrButton:
+#                    name: 'lightning_channels_dialog'
+#                    text: _('Channels')
                 ActionOvrButton:
                     name: 'settings'
                     text: _('Settings')
