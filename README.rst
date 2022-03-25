@@ -9,26 +9,12 @@ Electrum Particl - Lightweight Particl client
   Homepage: https://electrum.org/
 
 
-.. image:: https://api.cirrus-ci.com/github/spesmilo/electrum.svg?branch=master
-    :target: https://cirrus-ci.com/github/spesmilo/electrum
-    :alt: Build Status
-.. image:: https://coveralls.io/repos/github/spesmilo/electrum/badge.svg?branch=master
-    :target: https://coveralls.io/github/spesmilo/electrum?branch=master
-    :alt: Test coverage statistics
-.. image:: https://d322cqt584bo4o.cloudfront.net/electrum/localized.svg
-    :target: https://crowdin.com/project/electrum
-    :alt: Help translate Electrum online
-
-
-
-
-
 Getting started
 ===============
 
-(*If you've come here looking to simply run Electrum,* `you may download it here`_.)
+(*If you've come here looking to simply run Electrum Particl,* `you may download it here`_.)
 
-.. _you may download it here: https://electrum.org/#download
+.. _you may download it here: https://github.com/particl/electrum/releases
 
 Electrum itself is pure Python, and so are most of the required dependencies,
 but not everything. The following sections describe how to run from source, but here
@@ -61,13 +47,6 @@ Install from your package manager (or from pip)::
     sudo apt-get install python3-cryptography
 
 
-If you would like hardware wallet support, see `this`_.
-
-.. _libsecp256k1: https://github.com/bitcoin-core/secp256k1
-.. _pycryptodomex: https://github.com/Legrandin/pycryptodome
-.. _cryptography: https://github.com/pyca/cryptography
-.. _this: https://github.com/spesmilo/electrum-docs/blob/master/hardware-linux.rst
-
 Running from tar.gz
 -------------------
 
@@ -94,7 +73,7 @@ Development version (git clone)
 
 Check out the code from GitHub::
 
-    git clone git://github.com/spesmilo/electrum.git
+    git clone git://github.com/particl/electrum.git
     cd electrum
     git submodule update --init
 
@@ -159,13 +138,4 @@ Contributing
 Any help testing the software, reporting or fixing bugs, reviewing pull requests
 and recent changes, writing tests, or helping with outstanding issues is very welcome.
 Implementing new features, or improving/refactoring the codebase, is of course
-also welcome, but to avoid wasted effort, especially for larger changes,
-we encourage discussing these on the issue tracker or IRC first.
-
-Besides `GitHub`_, most communication about Electrum development happens on IRC, in the
-:code:`#electrum` channel on Libera Chat. The easiest way to participate on IRC is
-with the web client, `web.libera.chat`_.
-
-
-.. _web.libera.chat: https://web.libera.chat/#electrum
-.. _GitHub: https://github.com/spesmilo/electrum
+also welcome.
