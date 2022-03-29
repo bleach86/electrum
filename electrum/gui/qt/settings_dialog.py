@@ -38,6 +38,7 @@ from electrum.util import base_units_list
 from electrum.gui.qt.util import custom_message_box
 from electrum.gui import messages
 from electrum.wallet import decode_cs_changeaddress, process_cs_spend_addrs
+from electrum.bip32 import is_xpub
 
 from .util import (ColorScheme, WindowModalDialog, HelpLabel, Buttons,
                    CloseButton)
@@ -196,7 +197,7 @@ class SettingsDialog(WindowModalDialog):
         cs_wallet_label = QLabel(_('Wallet') + ':')
         cs_wallet_value = QLabel(self.window.wallet.basename())
         cs_widgets.append((cs_wallet_label, cs_wallet_value))
-        msg = _('Coldstaking changeaddress.') + '\n\n'\
+        msg = _('Coldstaking change address.') + '\n\n'\
               + 'For more information, see https://particl.wiki/tutorial/staking/cold-staking/'
         cs_changeaddress_label = HelpLabel(_('Coldstaking Change Address') + ':', msg)
         cs_changeaddress = self.window.wallet.db.get('cs_changeaddress','')
@@ -204,6 +205,22 @@ class SettingsDialog(WindowModalDialog):
         self.set_cs_changeaddress_color()
         self.cs_changeaddress_e.editingFinished.connect(self.on_cs_changeaddress_edit)
         cs_widgets.append((cs_changeaddress_label, self.cs_changeaddress_e))
+
+        msg = _('Changeaddress keys derived.') + '\n\n'\
+              + 'Number of keys derived if Changeaddress is an extaddress'
+        cs_changeaddress_derived_label = HelpLabel(_('Change Address Keys Derived') + ':', msg)
+        cs_changeaddress_derived = self.window.wallet.db.get('cs_changeaddress_derived','')
+        self.cs_changeaddress_derived_e = QLineEdit('')
+        try:
+            cs_changeaddress_derived = str(self.window.wallet.get_stakechangeaddressderives())
+            self.cs_changeaddress_derived_e.setDisabled(False)
+        except Exception as e:
+            cs_changeaddress_derived = ''
+            self.cs_changeaddress_derived_e.setDisabled(True)
+        self.cs_changeaddress_derived_e.setText(cs_changeaddress_derived)
+        #self.set_cs_changeaddress_color()
+        self.cs_changeaddress_derived_e.editingFinished.connect(self.on_cs_changeaddress_derived_edit)
+        cs_widgets.append((cs_changeaddress_derived_label, self.cs_changeaddress_derived_e))
 
         msg = _('Coldstaking spend addresses.') + '\n\n'\
               + 'Change will only be sent to an address from the list if any are set.\n'\
@@ -600,11 +617,30 @@ class SettingsDialog(WindowModalDialog):
 
         try:
             self.window.wallet.set_cs_changeaddress(cs_changeaddress)
+            try:
+                self.cs_changeaddress_derived_e.setText(str(self.window.wallet.get_stakechangeaddressderives()))
+                self.cs_changeaddress_derived_e.setDisabled(False)
+            except Exception as e:
+                self.cs_changeaddress_derived_e.setText('')
+                self.cs_changeaddress_derived_e.setDisabled(True)
         except Exception as e:
             custom_message_box(icon=QMessageBox.Warning,
                                parent=None,
                                title=_('Error'),
                                text=_('Cannot set coldstaking changeaddress') + ' (1):\n' + repr(e))
+
+    def on_cs_changeaddress_derived_edit(self):
+        if not is_xpub(str(self.cs_changeaddress_e.text())):
+            return
+
+        try:
+            new_value = int(str(self.cs_changeaddress_derived_e.text()))
+            self.window.wallet.set_stakechangeaddressderives(new_value)
+        except Exception as e:
+            custom_message_box(icon=QMessageBox.Warning,
+                               parent=None,
+                               title=_('Error'),
+                               text=_('Cannot set coldstaking changeaddress keys derived') + ' (1):\n' + repr(e))
 
     def on_cs_spendaddresses_edit(self):
         new_text = self.cs_spendaddresses.toPlainText()
@@ -621,4 +657,5 @@ class SettingsDialog(WindowModalDialog):
             #                   title=_('Error'),
             #                   text=_('Cannot set coldstaking spend addresses') + ' (1):\n' + repr(e))
         if valid_data:
+            # TODO: Log message
             self.window.wallet.db.put('cs_spendaddresses', new_text)

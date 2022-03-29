@@ -85,6 +85,7 @@ from .paymentrequest import PaymentRequest
 from .util import read_json_file, write_json_file, UserFacingException
 from . import segwit_addr
 from . import constants
+from .bip32 import is_xpub, BIP32Node
 
 if TYPE_CHECKING:
     from .network import Network
@@ -1326,6 +1327,18 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
                 change_addrs = new_change_addrs
 
         stake_hash = decode_cs_changeaddress(cs_changeaddress)
+
+        if type(stake_hash) is BIP32Node:
+            db_key = 'cs_ext_stake_offset_' + cs_changeaddress
+            key_offset = self.db.get(db_key, 0)
+            if key_offset >= 0x80000000:
+                raise ValueError('Stake change address key chain exhausted.')
+            path = (key_offset,)
+            subkey = stake_hash.subkey_at_public_derivation(path)
+            pk = subkey.eckey.get_public_key_bytes(compressed=True)
+            stake_hash = ripemd(sha256(pk))
+            self.db.put(db_key, key_offset + 1)
+
         change_data = {'stake_hash': stake_hash}
         for addr in change_addrs:
             addrtype, _ = b58_address_to_hash160(addr)
@@ -2685,6 +2698,10 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         if address_str != '':
             decode_cs_changeaddress(address_str)
         self.db.put('cs_changeaddress', address_str)
+        if address_str != '':
+            self.logger.info(f'Set cs spendchangeaddress {address_str[:4]}...{address_str[-4:]}')
+        else:
+            self.logger.info(f'Removed cs spendchangeaddress')
         return True
 
     def add_cs_spendchangeaddress(self, address_str):
@@ -2704,6 +2721,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             addrs_str += '\n'
         addrs_str += address_str
         self.db.put('cs_spendaddresses', addrs_str)
+        self.logger.info(f'Added cs spendchangeaddress {address_str[:4]}...{address_str[-4:]}')
         return True
 
     def remove_cs_spendchangeaddress(self, address_str):
@@ -2725,6 +2743,7 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             else:
                 addrs_out.append(addr)
         self.db.put('cs_spendaddresses', '\n'.join(addrs_out))
+        self.logger.info(f'Removed cs spendchangeaddress {address_str[:4]}...{address_str[-4:]}')
         return has_changed
 
     def list_cs_spendchangeaddresses(self):
@@ -2735,6 +2754,33 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
             rv.append(EncodeBase58Check(bytes([constants.net.ADDRTYPE_P2PKH256]) + ph_hash))
         return rv
 
+    def get_stakechangeaddressderives(self, cs_changeaddress=None):
+        if cs_changeaddress is None:
+            cs_changeaddress = self.get_cs_changeaddress(None)
+
+        if cs_changeaddress is None:
+            raise ValueError('No stakechangeaddress specified or set.')
+
+        if not is_xpub(cs_changeaddress):
+            raise ValueError('Address must be an extkey.')
+
+        db_key = 'cs_ext_stake_offset_' + cs_changeaddress
+        return self.db.get(db_key, 0)
+
+    def set_stakechangeaddressderives(self, new_value):
+        cs_changeaddress = self.get_cs_changeaddress(None)
+        if cs_changeaddress is None or not is_xpub(cs_changeaddress):
+            raise ValueError('An extkey must be set as the stakechangeaddress to modify the number of keys derived.')
+
+        if new_value < 0:
+            raise ValueError('New value can\'t be less than 0.')
+        if new_value >= 0x80000000:
+            raise ValueError('New value can\'t be 0x80000000 or above.')
+
+        db_key = 'cs_ext_stake_offset_' + cs_changeaddress
+        self.db.put(db_key, new_value)
+        self.logger.info(f'Set cs stakechangeaddressderives to {new_value} for {cs_changeaddress[:6]}...{cs_changeaddress[-4:]}')
+        return True
 
 class Simple_Wallet(Abstract_Wallet):
     # wallet with a single keystore
@@ -3535,6 +3581,8 @@ def update_password_for_directory(config: SimpleConfig, old_password, new_passwo
 
 
 def decode_cs_changeaddress(address_str):
+    if is_xpub(address_str):
+        return BIP32Node.from_xkey(address_str)
     decoded_bech32 = segwit_addr.bech32_decode(address_str)
     hrp = decoded_bech32.hrp
     data_5bits = decoded_bech32.data

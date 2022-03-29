@@ -1291,6 +1291,16 @@ class Commands:
         """Return the 256bit address of the public key for the provided wallet address. """
         return wallet.get_addr256(address)
 
+    @command('wn')
+    async def cs_get_stakechangeaddressderives(self, address=None, wallet: Abstract_Wallet = None):
+        """Return the number of keys derived from an extkey stakechangeaddress. """
+        return wallet.get_stakechangeaddressderives(address)
+
+    @command('w')
+    async def cs_set_stakechangeaddressderives(self, new_value: str, wallet: Abstract_Wallet = None):
+        """Set the number of keys derived from an extkey stakechangeaddress. """
+        return wallet.set_stakechangeaddressderives(new_value)
+
 
 def eval_bool(x: str) -> bool:
     if x == 'false': return False
@@ -1334,7 +1344,7 @@ command_options = {
     'labels':      ("-l", "Show the labels of listed addresses"),
     'nocheck':     (None, "Do not verify aliases"),
     'imax':        (None, "Maximum number of inputs"),
-    'fee':         ("-f", "Transaction fee (absolute, in BTC)"),
+    'fee':         ("-f", "Transaction fee (absolute, in PART)"),
     'feerate':     (None, "Transaction fee rate (in sat/byte)"),
     'from_addr':   ("-F", "Source address (must be a wallet address; use sweep to spend from non-wallet address)."),
     'from_coins':  (None, "Source coins (must be in wallet; use sweep to spend from non-wallet address)."),
@@ -1355,7 +1365,7 @@ command_options = {
     'timeout':     (None, "Timeout in seconds"),
     'force':       (None, "Create new address beyond gap limit, if no more addresses are available."),
     'pending':     (None, "Show only pending requests."),
-    'push_amount': (None, 'Push initial amount (in BTC)'),
+    'push_amount': (None, 'Push initial amount (in PART)'),
     'expired':     (None, "Show only expired requests."),
     'paid':        (None, "Show only paid requests."),
     'show_addresses': (None, "Show input and output addresses"),
@@ -1371,6 +1381,7 @@ command_options = {
     'connection_string':      (None, "Lightning network node ID or network address"),
     'new_fee_rate': (None, "The Updated/Increased Transaction fee rate (in sat/byte)"),
     'strategies': (None, "Select RBF any one or multiple RBF strategies in any order, separated by ','; Options : 'CoinChooser','DecreaseChange','DecreasePayment' "),
+    'address': (None, "Address, the currently active cs stakechange address is used if not set."),
 }
 
 
@@ -1399,6 +1410,7 @@ arg_types = {
     'rbf': eval_bool,
     'timeout': float,
     'attempts': int,
+    'address': str,
 }
 
 config_variables = {
