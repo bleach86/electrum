@@ -49,8 +49,12 @@ from .bitcoin import (TYPE_ADDRESS, TYPE_SCRIPT, hash_160,
                       int_to_hex, push_script, b58_address_to_hash160,
                       opcodes, add_number_to_script, base_decode, is_segwit_script_type,
                       base_encode, construct_witness, construct_script)
-from .crypto import sha256d, ripemd
+from .crypto import sha256d, ripemd, sha256
 from .logging import get_logger
+
+from .bitcoin import is_stealth_address, decode_stealth_address
+from .ecc import ECPrivkey, ECPubkey, string_to_number
+
 
 if TYPE_CHECKING:
     from .wallet import Abstract_Wallet
@@ -66,6 +70,7 @@ OUTPUT_DATA = 4
 PARTICL_TXN_VERSION = 0xa0
 PARTICL_TXN_COINSTAKE = 2
 
+DO_STEALTH = 3
 
 class SerializationError(Exception):
     """ Thrown when there's a problem deserializing or serializing """
@@ -110,6 +115,12 @@ class Sighash(IntEnum):
         return False
 
 
+# Duplicated from lnutil.py to avoid circular import
+def get_ecdh(priv: bytes, pub: bytes) -> bytes:
+    pt = ECPubkey(pub) * string_to_number(priv)
+    return sha256(pt.get_public_key_bytes())
+
+
 class TxOutput:
     output_type: int
     scriptpubkey: bytes
@@ -125,9 +136,36 @@ class TxOutput:
         if not (isinstance(value, int) or parse_max_spend(value) is not None):
             raise ValueError(f"bad txout value: {value!r}")
         self.value = value  # int in satoshis; or spend-max-like str
+        self.data = None
+
+    @classmethod
+    def from_data(cls, data: bytes) -> Union['TxOutput', 'PartialTxOutput']:
+        rv = cls(scriptpubkey=None, value=0)
+        rv.output_type = OUTPUT_DATA
+        rv.data = data
+        return rv
 
     @classmethod
     def from_address_and_value(cls, address: str, value: Union[int, str]) -> Union['TxOutput', 'PartialTxOutput']:
+
+        if is_stealth_address(address):
+            pk_scan_bytes, pk_spend_bytes = decode_stealth_address(address)
+
+            ecc_vk_ephemeral = ECPrivkey.generate_random_key()
+            vk_ephem_bytes = ecc_vk_ephemeral.get_secret_bytes()
+
+            shared_secret_bytes = get_ecdh(vk_ephem_bytes, pk_scan_bytes)
+            pk_output = ECPrivkey(shared_secret_bytes) + ECPubkey(pk_spend_bytes)
+
+            pk_output_bytes = pk_output.get_public_key_bytes(compressed=True)
+            pk_ephem_bytes = ecc_vk_ephemeral.get_public_key_bytes(compressed=True)
+
+            address = bitcoin.pubkey_to_address('p2pkh', pk_output_bytes.hex())
+            rv = cls(scriptpubkey=bfh(bitcoin.address_to_script(address)),
+                     value=value)
+            rv.data = bytes((DO_STEALTH,)) + pk_ephem_bytes
+            return rv
+
         return cls(scriptpubkey=bfh(bitcoin.address_to_script(address)),
                    value=value)
 
@@ -201,7 +239,11 @@ class TxOutput:
         return f"SCRIPT {self.scriptpubkey.hex()}"
 
     def __repr__(self):
-        return f"<TxOutput script={self.scriptpubkey.hex()} address={self.address} value={self.value}>"
+        if self.output_type == OUTPUT_STANDARD:
+            return f"<TxOutput script={self.scriptpubkey.hex()} address={self.address} value={self.value}>"
+        elif self.output_type == OUTPUT_DATA:
+            return f"<TxOutput data={self.data.hex()}>"
+        return f"<TxOutput Unknown type {self.output_type}>"
 
     def __eq__(self, other):
         if not isinstance(other, TxOutput):
@@ -2018,7 +2060,26 @@ class PartialTransaction(Transaction):
         if inputs:
             self._inputs.sort(key = lambda i: (i.prevout.txid, i.prevout.out_idx))
         if outputs:
+
+            # Fold data outputs that need to stay in place (stealth data output affects txo before it)
+            i = 1
+            while i < len(self._outputs):
+                txo = self._outputs[i]
+                if txo.output_type == OUTPUT_DATA and len(txo.data) > 1 and txo.data[0] == DO_STEALTH:
+                    self._outputs[i-1].data = txo.data
+                    del self._outputs[i]
+                else:
+                    i += 1
+
             self._outputs.sort(key = lambda o: (o.value, o.scriptpubkey))
+
+            i = 0
+            while i < len(self._outputs):
+                txo = self._outputs[i]
+                if txo.output_type == OUTPUT_STANDARD and txo.data is not None:
+                    self._outputs.insert(i + 1, PartialTxOutput.from_data(txo.data))
+                    i += 1
+                i += 1
         self.invalidate_ser_cache()
 
     def input_value(self) -> int:
@@ -2224,6 +2285,8 @@ class PartialTransaction(Transaction):
         for txin in self.inputs():
             txin.bip32_paths.clear()
         for txout in self.outputs():
+            if txout.output_type == OUTPUT_DATA:
+                continue
             txout.bip32_paths.clear()
 
     def prepare_for_export_for_coinjoin(self) -> None:

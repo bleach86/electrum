@@ -2,6 +2,8 @@
 
 ## Coldstaking
 
+To setup coldstaking the wallet must be initialised in legacy mode.
+
 When using an extaddress as the coldstaking change address the wallet will
 derive new addresses to use for each change output created.
 

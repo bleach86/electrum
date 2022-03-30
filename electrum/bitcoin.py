@@ -749,10 +749,49 @@ def is_b58_address(addr: str, *, net=None) -> bool:
         return False
     return True
 
+
+def is_stealth_address(addr: str, *, net=None) -> bool:
+    if net is None: net = constants.net
+    try:
+        addr = to_bytes(addr, 'ascii')
+        _bytes = DecodeBase58Check(addr)
+    except Exception as e:
+        return False
+    if len(_bytes) < 71:  # version + 70bytes
+        return False
+    if _bytes[0] != net.ADDRTYPE_STEALTH_ADDRESS:
+        return False
+    if _bytes[35] != 1:
+        return False  # Multiple spend keys not supported
+    if _bytes[69] != 0:
+        return False  # Multiple signatures not supported
+    return True
+
+
+def decode_stealth_address(addr: str, *, net=None) -> Tuple[bytes, bytes]:
+    if net is None: net = constants.net
+    try:
+        addr = to_bytes(addr, 'ascii')
+        _bytes = DecodeBase58Check(addr)
+    except Exception as e:
+        return None, None
+    if len(_bytes) < 70:  # version + 70bytes
+        return None, None
+    if _bytes[0] != net.ADDRTYPE_STEALTH_ADDRESS:
+        return None, None
+
+    if _bytes[35] != 1:
+        return None, None  # Multiple spend keys not supported
+    if _bytes[69] != 0:
+        return None, None  # Multiple signatures not supported
+    return _bytes[2:35], _bytes[36:69]
+
+
 def is_address(addr: str, *, net=None) -> bool:
     if net is None: net = constants.net
     return is_segwit_address(addr, net=net) \
-           or is_b58_address(addr, net=net)
+           or is_b58_address(addr, net=net) \
+           or is_stealth_address(addr, net=net)
 
 
 def is_private_key(key: str, *, raise_on_error=False) -> bool:

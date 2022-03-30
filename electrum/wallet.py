@@ -86,6 +86,7 @@ from .util import read_json_file, write_json_file, UserFacingException
 from . import segwit_addr
 from . import constants
 from .bip32 import is_xpub, BIP32Node
+from .transaction import OUTPUT_DATA
 
 if TYPE_CHECKING:
     from .network import Network
@@ -2039,6 +2040,8 @@ class Abstract_Wallet(AddressSynchronizer, ABC):
         return tx
 
     def add_output_info(self, txout: PartialTxOutput, *, only_der_suffix: bool = False) -> None:
+        if txout.output_type == OUTPUT_DATA:
+            return
         address = txout.address
         if not self.is_mine(address):
             is_mine = self._learn_derivation_path_for_address_from_txinout(txout, address)

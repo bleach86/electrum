@@ -80,6 +80,7 @@ class ParticlMainnet(AbstractNet):
     SEGWIT_HRP = "pw"
     STAKE_ONLY_PKADDR_HRP = "pcs"
     ADDRTYPE_P2PKH256 = 0x39
+    ADDRTYPE_STEALTH_ADDRESS = 0x14
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000ee0784c195317ac95623e22fddb8c7b8825dc3998e0bb924d66866eccf4c"
     DEFAULT_PORTS = {'t': '50001', 's': '50002'}
@@ -119,6 +120,7 @@ class ParticlTestnet(AbstractNet):
     SEGWIT_HRP = "tpw"
     STAKE_ONLY_PKADDR_HRP = "tpcs"
     ADDRTYPE_P2PKH256 = 0x77
+    ADDRTYPE_STEALTH_ADDRESS = 0x15
     BOLT11_HRP = SEGWIT_HRP
     GENESIS = "0000594ada5310b367443ee0afd4fa3d0bbd5850ea4e33cdc7d6a904a7ec7c90"
     DEFAULT_PORTS = {'t': '51001', 's': '51002'}

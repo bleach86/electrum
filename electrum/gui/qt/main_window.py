@@ -1672,6 +1672,11 @@ class ElectrumWindow(QMainWindow, MessageBoxMixin, Logger):
                 if self.check_send_tab_onchain_outputs_and_show_errors(outputs):
                     return
                 message = self.message_e.text()
+                if self.payto_e and self.payto_e.payto_stealth_address:
+                    sxaddr = self.payto_e.payto_stealth_address
+                    message = 'sx: ' + sxaddr[:8] + '...' + sxaddr[-6:] + ' ' + message
+                    self.payto_e.payto_stealth_address = None
+
                 return self.wallet.create_invoice(
                     outputs=outputs,
                     message=message,

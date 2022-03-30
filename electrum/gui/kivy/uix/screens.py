@@ -24,6 +24,7 @@ from .dialogs.confirm_tx_dialog import ConfirmTxDialog
 
 from electrum.gui.kivy import KIVY_GUI_PATH
 from electrum.gui.kivy.i18n import _
+from electrum.bitcoin import is_stealth_address
 
 if TYPE_CHECKING:
     from electrum.gui.kivy.main_window import ElectrumWindow
@@ -243,6 +244,7 @@ class SendScreen(CScreen, Logger):
             assert isinstance(item, OnchainInvoice)
             address = item.get_address()
             is_bip70 = bool(item.bip70)
+
         return {
             'is_lightning': is_lightning,
             'is_bip70': is_bip70,
@@ -311,6 +313,8 @@ class SendScreen(CScreen, Logger):
                 self.app.show_error(_('Invalid amount') + ':\n' + self.amount)
                 return
         message = self.message
+        if is_stealth_address(address):
+            message = 'sx: ' + address[:8] + '...' + address[-6:] + ' ' + message
         try:
             if self.is_lightning:
                 return LNInvoice.from_bech32(address)
