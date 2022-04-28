@@ -517,17 +517,21 @@ class BaseTxDialog(QDialog, MessageBoxMixin):
         else:
             self.amount_label.hide()
         size_str = _("Size:") + ' %d bytes'% size
+        is_coinstake = self.tx.is_coinstake()
         if fee is None:
             fee_str = _("Fee") + ': ' + _("unknown")
         else:
-            fee_str = _("Fee") + f': {format_amount(fee)} {base_unit}'
+            if is_coinstake:
+                fee_str = _("Stake Reward") + f': {format_amount(-fee)} {base_unit}'
+            else:
+                fee_str = _("Fee") + f': {format_amount(fee)} {base_unit}'
             if fx.is_enabled():
                 if tx_item_fiat:
                     fiat_fee_str = tx_item_fiat['fiat_fee'].to_ui_string()
                 else:
                     fiat_fee_str = format_fiat_and_units(fee)
                 fee_str += f' ({fiat_fee_str})'
-        if fee is not None:
+        if is_coinstake is False and fee is not None:
             fee_rate = Decimal(fee) / size  # sat/byte
             fee_str += '  ( %s ) ' % self.main_window.format_fee_rate(fee_rate * 1000)
             if isinstance(self.tx, PartialTransaction):

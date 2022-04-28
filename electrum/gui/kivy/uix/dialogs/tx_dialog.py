@@ -40,6 +40,7 @@ Builder.load_string('''
     can_cpfp: False
     fee_str: ''
     feerate_str: ''
+    reward_str: ''
     date_str: ''
     date_label:''
     amount_str: ''
@@ -75,6 +76,9 @@ Builder.load_string('''
                     BoxLabel:
                         text: _('Amount sent') if root.is_mine else _('Amount received')
                         value: root.amount_str
+                    BoxLabel:
+                        text: _('Stake reward') if root.reward_str else ''
+                        value: root.reward_str
                     BoxLabel:
                         text: _('Transaction fee') if root.fee_str else ''
                         value: root.fee_str
@@ -172,7 +176,9 @@ class TxDialog(Factory.Popup):
                                  and self.can_sign
                                  and fee is not None
                                  and bool(self.wallet.get_warning_for_risk_of_burning_coins_as_fees(self.tx)))
-        if fee is not None and not risk_of_burning_coins:
+        if self.tx.is_coinstake() and fee is not None:
+            self.reward_str = format_amount(-fee)
+        elif fee is not None and not risk_of_burning_coins:
             self.fee_str = format_amount(fee)
             fee_per_kb = fee / self.tx.estimated_size() * 1000
             self.feerate_str = self.app.format_fee_rate(fee_per_kb)

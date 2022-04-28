@@ -129,7 +129,10 @@ class HistoryScreen(CScreen):
             icon = f'atlas://{KIVY_GUI_PATH}/theming/atlas/light/' + TX_ICONS[status]
             message = tx_item['label'] or tx_hash
             fee = tx_item['fee_sat']
-            fee_text = '' if fee is None else 'fee: %d sat'%fee
+            if fee is not None and fee < 0:
+                fee_text = 'reward: %d sat'%(-fee)
+            else:
+                fee_text = '' if fee is None else 'fee: %d sat'%fee
         ri = {}
         ri['screen'] = self
         ri['key'] = key
