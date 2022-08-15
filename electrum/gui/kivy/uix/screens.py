@@ -486,7 +486,7 @@ class ReceiveScreen(CScreen):
         self.address = addr
 
     def on_address(self, addr):
-        req = self.app.wallet.get_request(addr)
+        req = self.app.wallet.get_request_by_addr(addr)
         self.status = ''
         if req:
             self.message = req.get('memo', '')
